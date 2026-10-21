@@ -1,0 +1,41 @@
+<!-- body.html 에 리뷰 한 건마다 이 카드를 하나씩 쓴다. 조치 필요 건을 맨 위로, 나머지는 행 순서대로. -->
+<!-- data-flag : 사과·확인이 필요한 건만 "sorry"(노란 줄), 하자·AS급이면 "as"(빨간 줄). 없으면 속성 자체를 뺀다. -->
+<!-- data-month: 한달사용이면 1, 일반이면 0 / data-photo: 사진 있으면 1, 없으면 0 -->
+
+    <!-- 행N -->
+    <article class="rev" data-flag="sorry" data-month="1" data-photo="1">
+      <div class="stripe"></div>
+      <div>
+        <div class="meta">
+          <span class="rowno">행 NN</span><span class="tag month">한달사용</span>
+          <span class="stars">★★★★★</span><span class="who">작성자ID · MM.DD</span>
+        </div>
+        <h2 class="prod">짧은 제품명 · 옵션</h2>
+        <blockquote class="text">리뷰 원문 그대로</blockquote>
+        <div class="prior"><em>첫 리뷰</em> · M열 첫 리뷰 원문 (한달사용일 때만)</div>
+        <figure><button type="button" data-full="__IMGN__"><img src="__IMGN__" alt="행N 리뷰 사진"></button></figure>
+      </div>
+      <div class="reply-col">
+        <div class="rhead"><span class="lbl">답글</span><button class="copy">복사</button></div>
+        <div class="reply">답글 본문 첫 줄
+답글 본문...
+마지막 문장! 저희 플레르가구를 믿고 구매해주셔서 감사합니다!
+
+[플레르가구]
+고객센터 : 010-8981-0097
+인스타 : @_plaire_official</div>
+        <p class="note">담당자에게만 보이는 메모 (필요할 때만)</p>
+      </div>
+    </article>
+
+<!--
+태그 종류
+  <span class="tag">일반</span>
+  <span class="tag month">한달사용</span>
+  <span class="tag sorry">짧은 사유</span>      (data-flag="sorry" 와 같이)
+  <span class="tag as">짧은 사유</span>         (data-flag="as" 와 같이)
+  <span class="tag">재구매</span> / <span class="tag">세트 구매</span> 등 자유롭게
+별점: ★ 개수만큼 채우고 나머지는 ☆. ★3 이하는 class="stars low".
+사진 없으면 <figure> 대신  <p class="nophoto">첨부된 사진 없음</p>
+답글 안(.reply)은 줄바꿈이 그대로 복사되므로 들여쓰기 없이 쓴다. & < > 는 &amp; &lt; &gt; 로.
+-->

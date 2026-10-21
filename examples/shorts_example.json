@@ -1,0 +1,151 @@
+{
+  "source_dir": "../사진자료",
+  "public_dir": "public",
+  "output": "모듈3단서랍장_숏츠.mp4",
+  "crops": {
+    "s1_hook": {
+      "file": "1210-021.jpg",
+      "cx": 0.55
+    },
+    "drawer": {
+      "file": "1210-042.jpg",
+      "cx": 0.45
+    },
+    "frame": {
+      "file": "1210-024.jpg",
+      "cx": 0.62
+    },
+    "green_top": {
+      "file": "1210-064.jpg",
+      "cx": 0.4
+    },
+    "end": {
+      "file": "1210-015.jpg",
+      "cx": 0.55
+    }
+  },
+  "copy": {
+    "lineup.jpg": "hf_20261019_051648_f2f9aff3-979a-485f-8cba-308b491c42f7.png"
+  },
+  "music": {
+    "style": "jazz",
+    "bpm": 120
+  },
+  "fps": 30,
+  "brand": "PLAIRE 플레르가구",
+  "accent": "#f2c94c",
+  "bgmVolume": 0.8,
+  "scenes": [
+    {
+      "type": "pan",
+      "frames": 75,
+      "src": "lineup.jpg",
+      "aspect": 2.3301,
+      "height": 1716,
+      "top": -46,
+      "bandTop": 520,
+      "caption": [
+        "소파 옆 빈자리,",
+        "**컬러 하나**로 채워요"
+      ],
+      "items": [
+        {
+          "name": "블랙",
+          "hex": "#1e1e1e",
+          "x": 0.189
+        },
+        {
+          "name": "화이트",
+          "hex": "#f4f4f2",
+          "x": 0.348
+        },
+        {
+          "name": "옐로우",
+          "hex": "#e6c02f",
+          "x": 0.508
+        },
+        {
+          "name": "네이비",
+          "hex": "#2f3549",
+          "x": 0.667
+        },
+        {
+          "name": "딥그린",
+          "hex": "#2f4a42",
+          "x": 0.827
+        }
+      ]
+    },
+    {
+      "type": "photo",
+      "src": "s1_hook.jpg",
+      "frames": 75,
+      "zoom": [
+        1.12,
+        1.0
+      ],
+      "caption": [
+        "무드등 하나 올리면",
+        "**감성 코너** 완성"
+      ]
+    },
+    {
+      "type": "photo",
+      "src": "drawer.jpg",
+      "frames": 75,
+      "panY": -40,
+      "caption": [
+        "넉넉한 **3단 서랍**,",
+        "부드러운 볼레일"
+      ],
+      "sub": "자주 쓰는 소지품을 종류별로 정리"
+    },
+    {
+      "type": "photo",
+      "src": "frame.jpg",
+      "frames": 60,
+      "zoom": [
+        1.0,
+        1.12
+      ],
+      "caption": [
+        "**15T** 스테인리스",
+        "실버 프레임"
+      ],
+      "sub": "수평 조절발로 흔들림 없이"
+    },
+    {
+      "type": "photo",
+      "src": "green_top.jpg",
+      "frames": 60,
+      "zoom": [
+        1.1,
+        1.0
+      ],
+      "caption": [
+        "USM 감성 그대로,",
+        "**국내에서** 만들었어요"
+      ],
+      "sub": "E1 등급 자재 · KC 인증"
+    },
+    {
+      "type": "end",
+      "src": "end.jpg",
+      "frames": 120,
+      "title": [
+        "미드센츄리",
+        "모듈 3단 서랍장"
+      ],
+      "spec": "W600 · D400 · H640 mm",
+      "chips": [
+        "#f4f4f2",
+        "#e6c02f",
+        "#2f4a42",
+        "#2f3549",
+        "#1e1e1e"
+      ],
+      "cta": "검색창에 **플레르가구**"
+    }
+  ],
+  "bgm": "bgm.wav"
+}

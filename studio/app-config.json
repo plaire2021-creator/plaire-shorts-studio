@@ -1,0 +1,16 @@
+{
+  "youtube": {
+    "client_id": "763210958273-0tv00l1hl2keo39k5v454t2v4281p0qs.apps.googleusercontent.com",
+    "client_secret": ""
+  },
+  "instagram": {
+    "app_id": "1843390043497509",
+    "app_secret": "",
+    "api_version": "v23.0"
+  },
+  "tiktok": {
+    "client_key": "sbawfybv6b2a3hbec2",
+    "client_secret": "",
+    "redirect_uri": ""
+  }
+}

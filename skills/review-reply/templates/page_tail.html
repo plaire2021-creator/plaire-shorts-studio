@@ -1,0 +1,68 @@
+  </main>
+
+  <footer>
+    {{FOOTER}}
+  </footer>
+
+</div>
+
+<dialog id="lb">
+  <form method="dialog"><button>닫기</button></form>
+  <img id="lbImg" alt="리뷰 사진 크게 보기">
+</dialog>
+
+<script>
+  "use strict";
+  var chips = document.querySelectorAll(".chip");
+  var rows = document.querySelectorAll(".rev");
+  var countEl = document.getElementById("count");
+
+  function apply(mode) {
+    var shown = 0;
+    rows.forEach(function (r) {
+      var ok = mode === "all"
+        || (mode === "flag"  && r.hasAttribute("data-flag"))
+        || (mode === "month" && r.dataset.month === "1")
+        || (mode === "photo" && r.dataset.photo === "1");
+      r.hidden = !ok;
+      if (ok) shown++;
+    });
+    countEl.textContent = shown + " / " + rows.length + " 건 표시";
+  }
+  chips.forEach(function (c) {
+    c.addEventListener("click", function () {
+      chips.forEach(function (o) { o.setAttribute("aria-pressed", String(o === c)); });
+      apply(c.dataset.filter);
+    });
+  });
+  apply("all");
+
+  document.querySelectorAll(".copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var text = btn.closest(".reply-col").querySelector(".reply").textContent;
+      var done = function () {
+        btn.textContent = "복사됨"; btn.classList.add("done");
+        setTimeout(function () { btn.textContent = "복사"; btn.classList.remove("done"); }, 1400);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { legacy(text); done(); });
+      } else { legacy(text); done(); }
+    });
+  });
+  function legacy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  var lb = document.getElementById("lb");
+  var lbImg = document.getElementById("lbImg");
+  document.querySelectorAll("figure button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      lbImg.src = b.dataset.full;
+      if (lb.showModal) lb.showModal();
+    });
+  });
+</script>
