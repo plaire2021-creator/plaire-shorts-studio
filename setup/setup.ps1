@@ -14,9 +14,10 @@ Write-Host "1/5 파이썬 패키지 (numpy, Pillow)"
 python -m pip install --quiet --upgrade numpy pillow openpyxl msoffcrypto-tool gspread google-auth
 
 Write-Host "2/5 영상 엔진 구성요소 (1~2분)"
-npm install --prefix "$root\engine" --no-audit --no-fund | Out-Null
+# 이미 깔려 있으면 건너뜀 (켜져 있는 업무 도구가 새 버전을 준비하며 같은 폴더에 설치 중일 수 있어서)
+if (-not (Test-Path "$root\engine\node_modules")) { npm install --prefix "$root\engine" --no-audit --no-fund | Out-Null }
 Write-Host "3/5 스튜디오 구성요소"
-npm install --prefix "$root\studio" --no-audit --no-fund | Out-Null
+if (-not (Test-Path "$root\studio\node_modules")) { npm install --prefix "$root\studio" --no-audit --no-fund | Out-Null }
 
 Write-Host "4/5 인스타 업로드용 임시 공개 주소 도구 (cloudflared)"
 if (-not (Get-Command cloudflared -ErrorAction SilentlyContinue) -and -not (Test-Path "C:\Program Files (x86)\cloudflared\cloudflared.exe")) {
