@@ -82,9 +82,10 @@ function renderInfo(){
     <label>제품명<input id="pf-name" type="text" value="${esc(S.product.name)}"></label>
     <label>출시일 (상품 등록일, D-day)<input id="pf-launch" type="date" value="${S.product.launch}"></label>
     <label>카테고리<input id="pf-cat" type="text" value="${esc(S.product.category)}"></label>
-  </div>${sheetBox()}<p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다. 제품을 지우려면 「← 제품 목록」에서 지우세요.</p>`;
+  </div><p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다. 제품을 지우려면 「← 제품 목록」에서 지우세요.</p>`;
 }
-// 상품 코드로 구글 시트(플레르가구·가즈다가구 상품등록 현황)에서 찾은 결과 — 제품에 같이 저장해서 팀 모두 같은 걸 본다
+// 상품 코드로 구글 시트(플레르가구·가즈다가구 상품등록 현황)에서 찾은 결과를 화면에 띄우지 않고 제품에만 저장해 둔다
+// (S.product.sheet.matches[].channels = 네이버·쿠팡·오늘의집 등록 여부 → 나중에 플랫폼별 상품등록 완료 확인에 쓸 것). sheetBox()는 지금 안 씀
 let lookingUp = false, lookErr = '';
 function sheetBox(){
   const sh = S.product.sheet;
