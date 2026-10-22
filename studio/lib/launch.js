@@ -12,6 +12,7 @@ const PDIR = path.join(DIR, "products");
 const OLD = path.join(DIR, "state.json"); // 1.16.0: 제품 하나만 저장하던 파일
 const DEFAULT = path.join(path.dirname(fileURLToPath(import.meta.url)), "launch-default.json"); // 팀장님 매뉴얼의 처음 내용(예시)
 export const OWNERS = ["MS팀", "김은하", "박주혁", "방채원"];
+export const BRANDS = ["플레르가구", "가즈다가구"];
 
 const file = (id) => path.join(PDIR, id + ".json");
 const okId = (id) => /^[a-z0-9-]{6,40}$/.test(String(id || ""));
@@ -55,7 +56,7 @@ export function list() {
         const open = s.checklists.flatMap((c) => c.items.filter((i) => i.st !== "완료" && i.st !== "보류").map((i) => ({ ...i, ch: c.name })));
         const nx = open.sort((a, b) => a.e - b.e || a.s - b.s || (a.step || 99) - (b.step || 99))[0]; // 마감이 가장 가까운 업무
         const next = nx ? `${nx.ch} ${String(nx.name).replace(/^\s*\[\d+\]\s*/, "")}` : "";
-        return { id: f.slice(0, -5), name: s.product.name, launch: s.product.launch, team: s.product.team, done: items.filter((i) => i.st === "완료").length, total: items.length, late, next, saved_at: saved_at || created_at };
+        return { id: f.slice(0, -5), name: s.product.name, brand: s.product.brand || s.product.sheet?.matches?.[0]?.brand || "", launch: s.product.launch, team: s.product.team, done: items.filter((i) => i.st === "완료").length, total: items.length, late, next, saved_at: saved_at || created_at };
       } catch {
         return null;
       }
@@ -74,13 +75,14 @@ export function load(id) {
 }
 
 // 새 제품: 팀장님 매뉴얼의 업무·체험단 틀만 가져오고, 상태·실적·예시 숫자는 비운다
-export function create({ name, launch, team }) {
+export function create({ name, launch, team, brand }) {
   name = String(name || "").trim().slice(0, 100);
   if (!name) throw new Error("제품명을 입력해 주세요");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(launch || ""))) throw new Error("출시일을 골라 주세요");
   if (!OWNERS.includes(team)) team = OWNERS[0];
+  if (!BRANDS.includes(brand)) throw new Error("플레르가구인지 가즈다가구인지 골라 주세요");
   const s = readDefault();
-  s.product = { name, launch, category: "", team, memo: "" };
+  s.product = { name, brand, launch, category: "", team, memo: "" };
   for (const c of s.checklists) for (const it of c.items) Object.assign(it, { st: "대기", memo: "", owner: team });
   for (const c of s.channels) Object.assign(c, { price: 0, margin: 0, qty: 0, ad: 0, promo: 0, etc: 0 });
   s.perf = {};

@@ -242,7 +242,7 @@
 #launchView .bar{height:6px}
 #launchView .err-box{padding:16px;border-radius:12px;background:var(--red-soft);color:var(--red)}
 #launchView .ln-stack{display:grid;gap:20px;align-content:start}
-#launchView .ln-new{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:0 14px}
+#launchView .ln-new{display:grid;grid-template-columns:auto minmax(0,2fr) minmax(0,1fr);gap:0 14px}
 #launchView .ln-new .fg{margin-bottom:6px}
 #launchView .ln-meta{white-space:nowrap;font-size:12.5px}
 #launchView .prodform select,#launchView .expset select{border:1px solid var(--line-2);border-radius:7px;padding:6px 8px;background:var(--card);font:inherit;font-size:13px;color:var(--ink)}
@@ -402,3 +402,9 @@
 #launchView td select:disabled{opacity:.8;cursor:not-allowed}
 #launchView .ds-foot{display:flex;gap:8px;flex-wrap:wrap}
 #launchView a.btn{text-decoration:none;color:var(--ink);display:inline-flex;align-items:center}
+/* 브랜드 */
+#launchView .ln-brand{padding:3px;border-radius:10px}
+#launchView .ln-brand button{padding:9px 14px;font-size:13px;border-radius:8px}
+#launchView .ln-btag{margin-right:6px;padding:1px 6px;font-size:11px;vertical-align:1px}
+#launchView .li-brand{border:1px solid transparent;border-radius:6px;padding:3px 6px;font:inherit;font-size:12px;font-weight:600;background:var(--blue-soft);color:var(--blue);cursor:pointer}
+#launchView .li-brand.gz{background:var(--amber-soft);color:var(--amber)}

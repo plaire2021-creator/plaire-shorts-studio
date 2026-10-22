@@ -10,7 +10,11 @@ const PCOL = ['var(--accent)','var(--x0)','var(--warn)','var(--x2)','var(--x3)',
 const pcol = ci => PCOL[ci % PCOL.length];
 const STC = {완료:'var(--ok)',진행중:'var(--info)',대기:'var(--accent)',보류:'var(--warn)',지연:'var(--bad)'};
 const ROOT = document.getElementById('launchView');
-const OWNERS = ['MS팀','김은하','박주혁','방채원']; // 담당은 이 중에서 고른다 (서버 lib/launch.js와 같게)
+const OWNERS = ['MS팀','김은하','박주혁','방채원'];
+const BRANDS = ['플레르가구','가즈다가구']; // 서버 lib/launch.js와 같게
+let newBrand = (()=>{ try{ return BRANDS.includes(localStorage.getItem('fleur-launch-brand')) ? localStorage.getItem('fleur-launch-brand') : BRANDS[0]; }catch(_){ return BRANDS[0]; } })();
+const brandTag = b => `<span class="tag ${b==='가즈다가구'?'amber':'blue'} ln-btag">${b==='가즈다가구'?'가즈다':'플레르'}</span>`;
+const prodBrand = () => S.product.brand || S.product.sheet?.matches?.[0]?.brand || ''; // 예전 제품은 시트에서 찾은 브랜드로 // 담당은 이 중에서 고른다 (서버 lib/launch.js와 같게)
 function ownerSel(id, attrs, v){
   const list = v && !OWNERS.includes(v) ? [...OWNERS, v] : OWNERS; // 예전에 손으로 적은 이름도 남겨 둔다
   return `<select id="${id}" ${attrs} aria-label="담당">${v?'':'<option value="" selected>미정</option>'}${list.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
@@ -79,7 +83,7 @@ function renderTop(){
   m.className = 'tag ' + (saveErr ? 'red' : (saving||dirty) ? 'amber' : 'green');
 }
 function renderInfo(){
-  $('#lnInfo').innerHTML = `<div class="li-head"><button class="mini" id="lnBack">← 제품 목록</button><h3>제품 정보</h3><span class="tag blue">${dlabel(dnum(TODAY))}</span>${S.product.memo?`<span class="tag amber" title="${esc(S.product.memo)}">예시</span>`:''}<span class="tag" id="lnSave"></span></div>
+  $('#lnInfo').innerHTML = `<div class="li-head"><button class="mini" id="lnBack">← 제품 목록</button><h3>제품 정보</h3><select id="pf-brand" class="li-brand ${prodBrand()==='가즈다가구'?'gz':''}" aria-label="브랜드">${prodBrand()?'':'<option value="" selected>브랜드 고르기</option>'}${BRANDS.map(b=>`<option ${b===prodBrand()?'selected':''}>${b}</option>`).join('')}</select><span class="tag blue">${dlabel(dnum(TODAY))}</span>${S.product.memo?`<span class="tag amber" title="${esc(S.product.memo)}">예시</span>`:''}<span class="tag" id="lnSave"></span></div>
   <div class="prodform li-form">
     <label>상품 코드 (옵션코드)<input id="pf-code" type="text" value="${esc(S.product.code||'')}" placeholder="예: 블랑누아거실장2600"></label>
     <label>제품명<input id="pf-name" type="text" value="${esc(S.product.name)}"></label>
@@ -111,7 +115,7 @@ const sheetCh = (it,c) => sheetChOf(it, c.name);
 const bySheet = (it, chName) => regTask(it) && !!sheetChOf(it, chName ?? it.ch); // 시트가 정하는 업무인지
 function sheetPending(){ return S.checklists.some(c=>c.items.some(it=>it.st!=='완료' && bySheet(it, c.name))); }
 function applySheet(){
-  const ms = S.product.sheet?.matches || [], done = [];
+  const ms = (S.product.sheet?.matches || []).filter(m=>!prodBrand() || m.brand===prodBrand()), done = [];
   if(!ms.length) return done;
   S.checklists.forEach(c=>c.items.forEach(it=>{
     const k = bySheet(it, c.name) && sheetCh(it,c); if(!k) return;
@@ -563,6 +567,7 @@ document.addEventListener('click', e=>{
   if(b.dataset.goperf){ tab='gp'; goalMode='perf'; perfCp=b.dataset.goperf; render(); window.scrollTo(0,0); return; }
   if(b.dataset.gostep){ const n=+b.dataset.gostep; if(n===EXPN()){ tab='exp'; expSel='all'; } else { tab='work'; workMode='prog'; CF={step:[stepNo(n)+' '+stepName(n)]}; } render(); return; }
   if(b.id==='lnAdd'){ addProduct(); return; }
+  if(b.dataset.lnbrand){ newBrand=b.dataset.lnbrand; try{localStorage.setItem('fleur-launch-brand',newBrand);}catch(_){} ROOT.querySelectorAll('[data-lnbrand]').forEach(x=>{ x.classList.toggle('on', x.dataset.lnbrand===newBrand); x.setAttribute('aria-checked', x.dataset.lnbrand===newBrand); }); return; }
   if(b.dataset.lndel){ delProduct(b.dataset.lndel, b.dataset.name); return; }
   if(b.dataset.tab){ tab=b.dataset.tab; editPeriod=-1; openCol=null; render(); try{localStorage.setItem('fleur-launch-tab',tab);}catch(_){} return; }
   if(b.dataset.goexp){ tab='exp'; expSel=b.dataset.goexp; render(); return; }
@@ -663,6 +668,7 @@ document.addEventListener('change', e=>{
     else if(ds.f==='ch'){ const to=+el.value; if(to!==t._ci){ S.checklists[t._ci].items.splice(t._ii,1); S.checklists[to].items.push(t); } }
     else t[ds.f]=el.value;
     markDirty(); if(['st','step','ch'].includes(ds.f)) render(); else renderTop(); return; }
+  if(el.id==='pf-brand'){ S.product.brand=el.value; applySheet(); markDirty(); render(); return; }
   if(el.id==='pf-code'){ S.product.code=el.value.trim(); lookErr=''; markDirty(); lookupCode(); return; }
   if(el.id==='pf-name'){ S.product.name=el.value; markDirty(); return; }
   if(el.id==='pf-launch' && el.value){ S.product.launch=el.value; calMonth=null; markDirty(); render(); return; }
@@ -718,6 +724,7 @@ async function showList(){
   const keep = { name: $('#lnNewName')?.value || '', launch: $('#lnNewLaunch')?.value || TODAY };
   box.innerHTML = `<section class="card"><div class="card-head"><h2>새 제품 추가</h2><span class="tag">업무·체험단 틀은 매뉴얼 그대로</span></div>
     <div class="ln-new">
+      <div class="fg"><span class="fg-label">브랜드</span><div class="seg ln-brand" role="radiogroup" aria-label="브랜드">${BRANDS.map(b=>`<button type="button" role="radio" data-lnbrand="${b}" aria-checked="${b===newBrand}" class="${b===newBrand?'on':''}">${b}</button>`).join('')}</div></div>
       <div class="fg"><label class="fg-label" for="lnNewName">제품명</label><input class="field" id="lnNewName" placeholder="예: 블랑누아 월넛 거실장 2600" value="${esc(keep.name)}"></div>
       <div class="fg"><label class="fg-label" for="lnNewLaunch">출시일 <small>상품 등록일 = D-day</small></label><input class="field" type="date" id="lnNewLaunch" value="${keep.launch}"></div>
     </div>
@@ -730,7 +737,7 @@ const pastP = p => dOf(p.launch) > 60 || (p.total && p.done === p.total);
 function lnRows(title, list, empty){
   const rows = list.map(p=>{
     const d = dOf(p.launch), all = p.total && p.done===p.total, c = p.late ? 'red' : all ? 'green' : 'amber';
-    return `<div class="active-row ${c}" data-lnopen="${esc(p.id)}" role="button" tabindex="0"><span class="name">${esc(p.name)}<small>${p.next?'다음 할 일 · '+esc(p.next):'남은 업무 없음'}</small></span><span class="muted ln-meta">출시 ${p.launch.replace(/-/g,'.')} · ${dlabel(d)}</span><span class="ln-bar" title="완료 ${p.done}/${p.total}"><i style="width:${pct(p.done,p.total)}%"></i></span><span class="tag ${c}">완료 ${p.done}/${p.total}${p.late?` · 지연 ${p.late}`:''}</span><span class="go">열기</span><button class="del" data-lndel="${esc(p.id)}" data-name="${esc(p.name)}">삭제</button></div>`; }).join('');
+    return `<div class="active-row ${c}" data-lnopen="${esc(p.id)}" role="button" tabindex="0"><span class="name">${p.brand?brandTag(p.brand):''}${esc(p.name)}<small>${p.next?'다음 할 일 · '+esc(p.next):'남은 업무 없음'}</small></span><span class="muted ln-meta">출시 ${p.launch.replace(/-/g,'.')} · ${dlabel(d)}</span><span class="ln-bar" title="완료 ${p.done}/${p.total}"><i style="width:${pct(p.done,p.total)}%"></i></span><span class="tag ${c}">완료 ${p.done}/${p.total}${p.late?` · 지연 ${p.late}`:''}</span><span class="go">열기</span><button class="del" data-lndel="${esc(p.id)}" data-name="${esc(p.name)}">삭제</button></div>`; }).join('');
   return `<section class="active-jobs">${title?`<div class="active-head">${title} <span class="count-badge">${list.length}</span></div>`:''}${rows || (empty?`<p class="active-empty">${empty}</p>`:'')}</section>`;
 }
 async function openProduct(id){
@@ -751,7 +758,7 @@ async function addProduct(){
   if(!launch){ err.textContent = '출시일을 골라 주세요'; return; }
   const b = $('#lnAdd'); b.disabled = true;
   try{
-    const r = await fetch('/api/launch/products', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, launch})});
+    const r = await fetch('/api/launch/products', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, launch, brand: newBrand})});
     const j = await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(j.error || '추가하지 못했어요');
     $('#lnNewName').value = '';
