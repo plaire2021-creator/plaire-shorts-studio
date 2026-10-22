@@ -282,9 +282,8 @@ function expCard(x, xi){
     <span class="xc-next ${late?'late':''}">${next}</span></button>`;
 }
 function vExp(){
-  const list = S.exp.map((x,xi)=>({x,xi})), on = list.filter(o=>goOf(o.x)!=='미진행'), off = list.filter(o=>goOf(o.x)==='미진행');
-  let h = `<div class="xc-grid">${on.map(o=>expCard(o.x,o.xi)).join('')}</div>`;
-  if(off.length) h += `<div class="xc-off"><span class="note">진행 안 함</span>${off.map(o=>expCard(o.x,o.xi)).join('')}</div>`;
+  // 미진행도 자리는 그대로 두고 카드만 흑백으로
+  let h = `<div class="xc-grid">${S.exp.map((x,xi)=>expCard(x,xi)).join('')}</div>`;
   const xi = S.exp.findIndex(x=>x.key===expOpen);
   if(xi < 0) return h + `<p class="note xc-hint">카드를 누르면 운영 단계와 참여자를 볼 수 있어요.</p>`;
   const x = S.exp[xi];
