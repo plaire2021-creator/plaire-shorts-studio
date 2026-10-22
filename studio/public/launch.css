@@ -425,3 +425,4 @@
 #launchView .s-보류 .ds-no{color:var(--red)}
 #launchView .hold-t{border:0;font:inherit;font-size:11.5px;font-weight:600;cursor:pointer;flex:none}
 #launchView .hold-t:hover{box-shadow:0 0 0 1px var(--red)}
+#launchView .td-row select.td-owner{flex:none;border:1px solid var(--line-2);border-radius:7px;padding:4px 6px;font:inherit;font-size:12px;background:var(--card);color:var(--ink);cursor:pointer}

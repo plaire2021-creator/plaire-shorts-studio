@@ -167,7 +167,7 @@ function hasPerf(cp){ const p=S.perf[cp]; return p && Object.values(p).some(v=>v
 function jLabel(j){ return {확대:'예산 확대',유지:'유지',하향:'입찰 하향',점검:'원인 점검'}[j]; }
 
 /* ---------- 탭: 오늘 (지금 할 일부터) ---------- */
-const mine = t => !OWN || (t.owner||'')===OWN;   // 담당 필터 (위쪽 담당 버튼은 없앰 — 지금은 늘 전체, 사람별로는 진행현황표의 담당 머리글 필터로 본다)
+const mine = t => !OWN || (t.owner||'')===OWN;   // 담당 필터 (지금은 늘 전체)
 const xMine = st => !OWN || (st.owner||'')===OWN;
 const dLeft = d => Math.round((parse(d)-parse(TODAY))/864e5);
 function expStepStatus(){ const all=S.exp.filter(xOn).flatMap(x=>x.steps.map(a=>({x,a})));
@@ -223,8 +223,8 @@ function vDash(){
         body = `<div class="reg-list">${ts.map(t=>`<span class="reg ${t.st==='완료'?'on':''}">${t.st==='완료'?'✓':'○'} ${esc(bare(t.name).replace(/\s*상품등록$/,''))}</span>`).join('')}</div>
           <p class="reg-note">${S.product.code ? `구글 시트 「상품등록 현황」에 등록(O)하면 자동으로 체크돼요.${at?' · '+at:''} <button class="linkbtn" id="lnLookup">지금 확인</button>` : '제품 정보에 상품 코드를 넣으면 구글 시트 「상품등록 현황」을 보고 자동으로 체크돼요.'}</p>`;
       } else if(open) body = ts.map(t=>{ const lt = isLate(t), s2 = lt ? '지연' : t.st;
-        if(contentStep(n)) return `<div class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)} · ${esc(t.owner||'담당 미정')}</small></span>${lt?`<span class="td-d bad">${dnum(TODAY)-t.e}일 지남</span>`:''}<span class="td-linkbox">${t.url?`<a class="td-open" href="${esc(t.url)}" target="_blank" rel="noopener" title="${esc(t.url)}">열기 ↗</a>`:''}<input class="td-link" type="url" id="lk-${t._ci}-${t._ii}" data-lnk="${t._ci}-${t._ii}" value="${esc(t.url||'')}" placeholder="게시물 링크 붙여넣기" aria-label="${esc(bare(t.name))} 링크"></span><button class="pill st-${s2} hold-t" data-hold="${t._ci}-${t._ii}" title="${t.st==='보류'?'누르면 보류를 풀어요':'누르면 보류로 바꿔요'}">${s2}</button></div>`;
-        return `<label class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)} · ${esc(t.owner||'담당 미정')}${t.rec==='weekly'?' · 매주 월요일':''}</small></span>${lt?`<span class="td-d bad">${dnum(TODAY)-t.e}일 지남</span>`:''}<button class="pill st-${s2} hold-t" data-hold="${t._ci}-${t._ii}" title="${t.st==='보류'?'누르면 보류를 풀어요':'누르면 보류로 바꿔요'}">${s2}</button></label>`; }).join('')
+        if(contentStep(n)) return `<div class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)}</small></span>${ownerSel(`ow-${t._ci}-${t._ii}`, `class="td-owner" data-own2="${t._ci}-${t._ii}"`, t.owner)}${lt?`<span class="td-d bad">${dnum(TODAY)-t.e}일 지남</span>`:''}<span class="td-linkbox">${t.url?`<a class="td-open" href="${esc(t.url)}" target="_blank" rel="noopener" title="${esc(t.url)}">열기 ↗</a>`:''}<input class="td-link" type="url" id="lk-${t._ci}-${t._ii}" data-lnk="${t._ci}-${t._ii}" value="${esc(t.url||'')}" placeholder="게시물 링크 붙여넣기" aria-label="${esc(bare(t.name))} 링크"></span><button class="pill st-${s2} hold-t" data-hold="${t._ci}-${t._ii}" title="${t.st==='보류'?'누르면 보류를 풀어요':'누르면 보류로 바꿔요'}">${s2}</button></div>`;
+        return `<label class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)}${t.rec==='weekly'?' · 매주 월요일':''}</small></span>${ownerSel(`ow-${t._ci}-${t._ii}`, `class="td-owner" data-own2="${t._ci}-${t._ii}"`, t.owner)}${lt?`<span class="td-d bad">${dnum(TODAY)-t.e}일 지남</span>`:''}<button class="pill st-${s2} hold-t" data-hold="${t._ci}-${t._ii}" title="${t.st==='보류'?'누르면 보류를 풀어요':'누르면 보류로 바꿔요'}">${s2}</button></label>`; }).join('')
         + toolLinks(nm);
     }
     h += `<div class="ds-row s-${st} ${open?'open':''}"><button class="ds-top" data-dsopen="${n}" aria-expanded="${open}"><span class="ds-no">${stepNo(n)}</span><span class="ds-nm">${esc(nm)}<small>${rng}${owners.length?' · '+owners.map(esc).join(', '):''}</small></span><span class="ds-chs">${chans}</span><span class="ds-prog"><span class="bar"><i style="width:${pct(d,tot)}%"></i></span><em>${d}/${tot}</em></span><span class="pill st-${st}">${st}</span><span class="ds-caret" aria-hidden="true">${open?'▴':'▾'}</span></button>${open?`<div class="ds-body">${body}</div>`:''}</div>`;
@@ -232,7 +232,7 @@ function vDash(){
   h += `</div></div>`;
   return h;
 }
-// 업무 = 진행현황표 + 채널별 체크리스트 + 업무 순서 (같은 업무를 보는 세 가지 방법)
+// (안 씀) 업무 탭: 진행현황표 + 채널별 체크리스트 + 업무 순서 — 사용자 요청으로 탭을 없앴고, 담당은 대시보드에서 고른다
 function vWork(){
   const M = [['prog','진행현황표'],['check','채널별 체크리스트'],['flow','업무 순서']];
   return `<div class="seg ln-sub">${M.map(([k,l])=>`<button data-wmode="${k}" class="${workMode===k?'on':''}">${l}</button>`).join('')}</div>` + ({prog:vProg, check:vCheck, flow:vFlow}[workMode])();
@@ -523,8 +523,8 @@ function vCal(){
     if(t.rec==='weekly'){ for(let w=w0; w<=w1; w++) (weeks[w]=weeks[w]||[]).push(t); } else (weeks[w0]=weeks[w0]||[]).push(t); });
   const wl = Object.keys(weeks).map(Number).sort((x,y)=>x-y);
   const doneAll = TT.filter(t=>t.st==='완료').length;
-  h += `<div class="panel" style="margin-top:16px"><h3>주차별 업무 현황 <span class="note" style="font-weight:400">· 완료 ${doneAll} / ${TT.length}건 · 완료/미완료는 「진행현황표」 상태를 따라 자동으로 바뀝니다</span></h3>
-    <p class="note" style="margin:0 0 12px">진행현황의 기간 시작일을 기준으로 주차를 나눴습니다(출시일 ${kd(S.product.launch)} = 1주차 첫날). 매주 반복 업무는 해당 주마다 표시됩니다. 상태를 바꾸려면 「진행현황표」 탭에서 바꾸세요.</p>
+  h += `<div class="panel" style="margin-top:16px"><h3>주차별 업무 현황 <span class="note" style="font-weight:400">· 완료 ${doneAll} / ${TT.length}건 · 완료/미완료는 대시보드 체크를 따라 자동으로 바뀝니다</span></h3>
+    <p class="note" style="margin:0 0 12px">업무 기간의 시작일을 기준으로 주차를 나눴습니다(출시일 ${kd(S.product.launch)} = 1주차 첫날). 매주 반복 업무는 해당 주마다 표시됩니다. 상태는 대시보드에서 바꾸세요.</p>
     <div class="weeks">`;
   if(!wl.length) h += `<p class="empty">선택한 플랫폼이 없습니다. 위 플랫폼 버튼을 켜 주세요.</p>`;
   wl.forEach(w=>{ const list = weeks[w].sort((x,y)=>(x.step||99)-(y.step||99)||x._ci-y._ci||x._ii-y._ii);
@@ -540,7 +540,7 @@ function vCal(){
 }
 
 /* ---------- 렌더·이벤트 ---------- */
-const TABS = [['dash','대시보드',vDash],['work','업무',vWork],['sched','일정',vCal],['exp','체험단',vExp],['gp','목표·성과',vGP]];
+const TABS = [['dash','대시보드',vDash],['sched','일정',vCal],['exp','체험단',vExp],['gp','목표·성과',vGP]];
 function shell(){
   ROOT.innerHTML = `<div class="welcome" id="lnWelcome"><h1>신제품 출시 매뉴얼</h1><p>제품마다 상품을 등록한 날(D-day)부터 채널별 할 일·체험단·판매 목표·성과를 한곳에서 챙겨요. 고친 내용은 자동으로 저장되고 팀 모두에게 똑같이 보여요.</p></div>
   <div id="lnList" class="ln-stack"></div>
@@ -575,7 +575,7 @@ document.addEventListener('click', e=>{
     markDirty(); render(); return; }
   if(b.dataset.dsopen){ const n=+b.dataset.dsopen; openSt.has(n)?openSt.delete(n):openSt.add(n); render(); return; }
   if(b.dataset.goperf){ tab='gp'; goalMode='perf'; perfCp=b.dataset.goperf; render(); window.scrollTo(0,0); return; }
-  if(b.dataset.gostep){ const n=+b.dataset.gostep; if(n===EXPN()){ tab='exp'; expSel='all'; } else { tab='work'; workMode='prog'; CF={step:[stepNo(n)+' '+stepName(n)]}; } render(); return; }
+  if(b.dataset.gostep){ const n=+b.dataset.gostep; if(n===EXPN()){ tab='exp'; expSel='all'; } else { tab='dash'; openSt.add(n); } render(); return; }
   if(b.id==='lnAdd'){ addProduct(); return; }
   if(b.dataset.lnbrand){ newBrand=b.dataset.lnbrand; try{localStorage.setItem('fleur-launch-brand',newBrand);}catch(_){} ROOT.querySelectorAll('[data-lnbrand]').forEach(x=>{ x.classList.toggle('on', x.dataset.lnbrand===newBrand); x.setAttribute('aria-checked', x.dataset.lnbrand===newBrand); }); return; }
   if(b.dataset.lndel){ delProduct(b.dataset.lndel, b.dataset.name); return; }
@@ -662,6 +662,7 @@ document.addEventListener('change', e=>{
     if(v && !/^https?:\/\//i.test(v) && /^[^\s]+\.[^\s]+$/.test(v)) v='https://'+v; // 주소만 붙여넣어도
     it.url = v; if(/^https?:\/\/\S+$/i.test(v)) setDone(it,true); else if(!v && it.st==='완료') it.st='대기';
     markDirty(); render(); return; }
+  if(ds.own2){ const [ci,ii]=ds.own2.split('-').map(Number); S.checklists[ci].items[ii].owner=el.value; markDirty(); render(); return; }
   if(ds.xck){ const [xi,si]=ds.xck.split('-').map(Number); S.exp[xi].steps[si].st = el.checked?'완료':'대기'; markDirty(); render(); return; }
   if(ds.ck){ const [c0,i0]=ds.ck.split('-').map(Number); if(bySheet(S.checklists[c0].items[i0], S.checklists[c0].name)){ render(); return; } }
   if(ds.ck){ const [ci,ii]=ds.ck.split('-').map(Number); setDone(S.checklists[ci].items[ii], el.checked); markDirty(); render(); return; }
