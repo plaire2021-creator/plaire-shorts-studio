@@ -400,3 +400,5 @@
 #launchView .linkbtn{border:0;background:none;padding:0;font:inherit;color:var(--blue);cursor:pointer;text-decoration:underline}
 #launchView .ckrow input[type=checkbox]:disabled{cursor:not-allowed;opacity:.85}
 #launchView td select:disabled{opacity:.8;cursor:not-allowed}
+#launchView .ds-foot{display:flex;gap:8px;flex-wrap:wrap}
+#launchView a.btn{text-decoration:none;color:var(--ink);display:inline-flex;align-items:center}

@@ -168,6 +168,17 @@ const xMine = st => !OWN || (st.owner||'')===OWN;
 const dLeft = d => Math.round((parse(d)-parse(TODAY))/864e5);
 function expStepStatus(){ const all=S.exp.filter(xOn).flatMap(x=>x.steps.map(a=>({x,a})));
   if(!all.length) return '대기'; if(all.every(o=>o.a.st==='완료')) return '완료'; if(all.some(o=>xLate(o.x,o.a))) return '지연'; if(all.some(o=>o.a.st!=='대기')) return '진행중'; return '대기'; }
+// 단계마다 그 일을 하는 업무 도구로 바로 가는 버튼 (단계 이름으로 고른다, 맞는 도구가 없으면 버튼 없음)
+const TOOL_LINKS = [
+  [/콘텐츠 제작|블로그/, [['블로그 작성 도우미','#/blog'],['숏츠 제작 및 업로드','#/shorts']]],
+  [/숏츠|콘텐츠 등록/, [['숏츠 제작 및 업로드','#/shorts'],['제작된 숏츠 업로드','#/upload']]],
+  [/노출 순위|광고 효율/, [['성과 분석','perf'],['주간 매출 통계','#/weekly-sales']]],
+];
+function toolLinks(stepName){
+  const f = TOOL_LINKS.find(([re])=>re.test(stepName)); if(!f) return '';
+  const nextCp = (S.checkpoints.find(c=>addD(S.product.launch,c.d)>=TODAY) || S.checkpoints[S.checkpoints.length-1]).key;
+  return `<div class="ds-foot">${f[1].map(([l,to])=>to==='perf' ? `<button class="btn small" data-goperf="${nextCp}">${l} →</button>` : `<a class="btn small" href="${to}">${l} →</a>`).join('')}</div>`;
+}
 function vDash(){
   const T = TK(), done = T.filter(t=>t.st==='완료').length, late = T.filter(isLate).length;
   const stepSt = n => n===EXPN() ? expStepStatus() : stepStatus(n);
@@ -204,7 +215,7 @@ function vDash(){
           <p class="reg-note">${S.product.code ? `구글 시트 「상품등록 현황」에 등록(O)하면 자동으로 체크돼요.${at?' · '+at:''} <button class="linkbtn" id="lnLookup">지금 확인</button>` : '제품 정보에 상품 코드를 넣으면 구글 시트 「상품등록 현황」을 보고 자동으로 체크돼요.'}</p>`;
       } else if(open) body = ts.map(t=>{ const lt = isLate(t), s2 = lt ? '지연' : t.st;
         return `<label class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)} · ${esc(t.owner||'담당 미정')}${t.rec==='weekly'?' · 매주 월요일':''}</small></span><span class="td-d ${lt?'bad':''}">${lt?(dnum(TODAY)-t.e)+'일 지남':periodTxt(t)}</span><span class="pill st-${s2}">${s2}</span></label>`; }).join('')
-        + `<div class="ds-foot"><button class="btn small" data-gostep="${n}">업무 탭에서 담당·기간 바꾸기</button></div>`;
+        + toolLinks(nm);
     }
     h += `<div class="ds-row s-${st} ${open?'open':''}"><button class="ds-top" data-dsopen="${n}" aria-expanded="${open}"><span class="ds-no">${stepNo(n)}</span><span class="ds-nm">${esc(nm)}<small>${rng}${owners.length?' · '+owners.map(esc).join(', '):''}</small></span><span class="ds-chs">${chans}</span><span class="ds-prog"><span class="bar"><i style="width:${pct(d,tot)}%"></i></span><em>${d}/${tot}</em></span><span class="pill st-${st}">${st}</span><span class="ds-caret" aria-hidden="true">${open?'▴':'▾'}</span></button>${open?`<div class="ds-body">${body}</div>`:''}</div>`;
   });
