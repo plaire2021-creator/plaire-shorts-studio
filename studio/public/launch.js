@@ -196,11 +196,17 @@ function vDash(){
   // 보류는 완료와 똑같이 진행도에 넣는다 (지연은 따로 나누지 않음)
   const ing = T.filter(t=>t.st==='진행중').length, hold = T.filter(t=>t.st==='보류').length, closed = done + hold, wait = T.length - closed - ing, p = pct(closed,T.length);
   const seg = (c,k) => k ? `<span class="${c}" style="width:${k/T.length*100}%" title="${k}건"></span>` : '';
-  let h = `<div class="ds-sum"><div class="tile"><div class="k">업무 진행</div><div class="v">${p}%</div><div class="s">완료 ${done}${hold?` · 보류 ${hold}`:''} / ${T.length}건</div></div>
+  // 업무 진행도 옆에 성과 탭의 판매·리뷰 (누르면 성과 탭으로)
+  const g = S.goal || {}, sl = salesTotal(), gq = +g.qty||0, sp = gq && sl.q!=null ? Math.min(100, Math.round(sl.q/gq*100)) : 0;
+  const rn = +g.reviewNow||0, rg = +g.reviewGoal||0, rp = rg ? Math.min(100, Math.round(rn/rg*100)) : 0;
+  if(S.product.code && !salesData[PID]) setTimeout(()=>loadSales(false), 0);
+  let h = `<div class="ds-sum ds-sum3">
   <div class="tile dm"><div class="dm-head"><span class="k">업무 진행도</span><b>${p}%</b><span class="s">${T.length-closed}건 남음</span></div>
   <div class="dm-bar">${seg('ok',done)}${seg('bad',hold)}${seg('ing',ing)}</div>
   <div class="dm-scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100%</span></div>
-  <div class="dm-lg"><span><i class="ok"></i>완료 ${done}</span><span><i class="bad"></i>보류 ${hold}</span><span><i class="ing"></i>진행중 ${ing}</span><span><i></i>대기 ${wait}</span></div></div></div>`;
+  <div class="dm-lg"><span><i class="ok"></i>완료 ${done}</span><span><i class="bad"></i>보류 ${hold}</span><span><i class="ing"></i>진행중 ${ing}</span><span><i></i>대기 ${wait}</span></div></div>
+  <button class="tile ds-kpi" data-tab="gp"><span class="k">판매 <em>3개 채널 합계</em></span><span class="v">${sl.q!=null?won0(sl.q):'-'}<small>${gq?` / ${gq}대`:'대'}</small></span><span class="bar"><i style="width:${sp}%"></i></span><span class="s">${sl.msg || (gq?`목표의 ${sp}%`:'성과 탭에서 목표를 적어 주세요')}</span></button>
+  <button class="tile ds-kpi" data-tab="gp"><span class="k">리뷰</span><span class="v">${rn}<small>${rg?` / ${rg}건`:'건'}</small></span><span class="bar"><i style="width:${rp}%"></i></span><span class="s">${rg?`목표의 ${rp}%`:'성과 탭에서 목표를 적어 주세요'}</span></button></div>`;
   h += `<div class="panel ds-main"><div class="ds-head"><h3>업무 진행 순서</h3></div><div class="ds-list">`;
   S.steps.forEach((nm,i)=>{
     const n = i+1, st = stepSt(n), open = openSt.has(n);
@@ -260,7 +266,17 @@ async function loadSales(force){
     const j = await r.json(); if(!r.ok) throw new Error(j.error || '주간 매출을 읽지 못했어요');
     salesData[pid] = {weeks: j.weeks};
   }catch(e){ salesData[pid] = {err: e.message}; }
-  if(pid === PID && tab==='gp') render();
+  if(pid === PID && (tab==='gp' || tab==='dash')) render();
+}
+// 대시보드용: 출시 후 3개 채널 판매 수량 합계 (성과 탭과 같은 방식으로 이 제품만)
+function salesTotal(){
+  const sd = salesData[PID];
+  if(!S.product.code) return {msg:'상품 코드를 넣으면 자동으로 채워져요'};
+  if(!sd || sd==='loading') return {msg:'불러오는 중…'};
+  if(sd.err) return {msg:'판매를 불러오지 못했어요'};
+  if(!sd.weeks.length) return {q:0, msg:'아직 주간 매출 통계 전이에요'};
+  let q = 0; sd.weeks.forEach(w=>CH3.forEach(([,k])=>(w.ch[k]||[]).forEach(b=>{ if(blockHit(k,b)) q += b.qty; })));
+  return {q};
 }
 function vGP(){
   const g = S.goal = S.goal || {}, memo = S.weekMemo = S.weekMemo || {}; S.salesKey = S.salesKey || {};

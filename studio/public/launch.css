@@ -556,3 +556,11 @@
 #launchView .gp-link h3{margin:0 0 4px}
 #launchView .gp-lrow{display:grid;grid-template-columns:100px minmax(0,1fr) 240px;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
 @media (max-width:900px){#launchView .gp-sum{grid-template-columns:repeat(2,minmax(0,1fr))}#launchView .gp-wk{grid-template-columns:90px minmax(0,1fr) 50px}#launchView .gp-a,#launchView .gp-memo{display:none}#launchView .gp-lrow{grid-template-columns:1fr}}
+/* 대시보드 위: 업무 진행도(절반) · 판매 · 리뷰 */
+#launchView .ds-sum.ds-sum3{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr)}
+#launchView .ds-kpi{display:grid;gap:6px;align-content:start;text-align:left;font:inherit;color:var(--ink);cursor:pointer;border:1px solid var(--line)}
+#launchView .ds-kpi:hover{border-color:var(--line-2)}
+#launchView .ds-kpi .k em{font-style:normal;font-size:11px;color:var(--faint);margin-left:4px}
+#launchView .ds-kpi .v small{font-size:13px;font-weight:600;color:var(--sub);margin-left:2px}
+#launchView .ds-kpi .bar{display:block}
+@media (max-width:900px){#launchView .ds-sum.ds-sum3{grid-template-columns:1fr 1fr}#launchView .ds-sum3 .dm{grid-column:1/-1}}
