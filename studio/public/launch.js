@@ -200,7 +200,7 @@ function vDash(){
   <div class="dm-bar">${seg('ok',done)}${seg('bad',hold)}${seg('ing',ing)}</div>
   <div class="dm-scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100%</span></div>
   <div class="dm-lg"><span><i class="ok"></i>완료 ${done}</span><span><i class="bad"></i>보류 ${hold}</span><span><i class="ing"></i>진행중 ${ing}</span><span><i></i>대기 ${wait}</span></div></div></div>`;
-  h += `<div class="panel ds-main"><div class="ds-head"><h3>${S.steps.length}단계 진행</h3><span class="note">완료 ${doneSteps} / ${S.steps.length}단계 · 업무 ${closed} / ${T.length}건${late?` · <b class="bad">지연 ${late}건</b>`:''} · 단계를 누르면 업무가 펼쳐져요</span></div><div class="ds-list">`;
+  h += `<div class="panel ds-main"><div class="ds-head"><h3>업무 진행 순서</h3></div><div class="ds-list">`;
   S.steps.forEach((nm,i)=>{
     const n = i+1, st = stepSt(n), open = openSt.has(n);
     let d, tot, rng, chans, owners, body = '';
