@@ -356,3 +356,25 @@
 #launchView .ds-body .td-row .pill{flex:none}
 #launchView .ds-foot{margin-top:10px}
 @media (max-width:900px){#launchView .ds-top{grid-template-columns:28px minmax(0,1fr) 90px 58px 12px}#launchView .ds-chs{display:none}#launchView .ds-body{padding-left:16px}#launchView .ds-all{margin-left:0}}
+/* 대시보드 위쪽: 업무 진행 + 진행도 */
+#launchView .ds-sum{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,3fr);gap:16px}
+#launchView .ds-sum .tile{margin:0}
+#launchView .dm{display:grid;gap:10px;align-content:center}
+#launchView .dm-head{display:flex;align-items:baseline;gap:10px}
+#launchView .dm-head b{font-size:22px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+#launchView .dm-head .s{margin-left:auto}
+#launchView .dm-bar{display:flex;height:16px;border-radius:8px;background:var(--bg);border:1px solid var(--line);overflow:hidden}
+#launchView .dm-bar span{display:block;height:100%}
+#launchView .dm-bar .ok{background:var(--green)}
+#launchView .dm-bar .ing{background:var(--blue)}
+#launchView .dm-bar .bad{background:var(--red)}
+#launchView .dm-bar .hold{background:var(--amber)}
+#launchView .dm-scale{display:flex;justify-content:space-between;margin-top:-6px;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+#launchView .dm-lg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--sub)}
+#launchView .dm-lg span{display:inline-flex;align-items:center;gap:6px}
+#launchView .dm-lg i{width:10px;height:10px;border-radius:3px;background:var(--bg);border:1px solid var(--line-2)}
+#launchView .dm-lg i.ok{background:var(--green);border-color:var(--green)}
+#launchView .dm-lg i.ing{background:var(--blue);border-color:var(--blue)}
+#launchView .dm-lg i.bad{background:var(--red);border-color:var(--red)}
+#launchView .dm-lg i.hold{background:var(--amber);border-color:var(--amber)}
+@media (max-width:760px){#launchView .ds-sum{grid-template-columns:1fr}}

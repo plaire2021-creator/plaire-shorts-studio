@@ -120,7 +120,15 @@ function vDash(){
   const T = TK(), done = T.filter(t=>t.st==='완료').length, late = T.filter(isLate).length;
   const stepSt = n => n===13 ? expStepStatus() : stepStatus(n);
   const doneSteps = S.steps.filter((_,i)=>stepSt(i+1)==='완료').length;
-  let h = `<div class="panel ds-main"><div class="ds-head"><h3>14단계 진행</h3><span class="note">완료 ${doneSteps} / 14단계 · 업무 ${done} / ${T.length}건${late?` · <b class="bad">지연 ${late}건</b>`:''} · 단계를 누르면 업무가 펼쳐져요</span><span class="ds-all"><span class="bar"><i style="width:${pct(done,T.length)}%"></i></span><b>${pct(done,T.length)}%</b></span></div><div class="ds-list">`;
+  // 위쪽: 업무 진행 카드 + 상태별로 나눈 진행도 막대
+  const ing = T.filter(t=>t.st==='진행중' && !isLate(t)).length, hold = T.filter(t=>t.st==='보류').length, wait = T.length - done - ing - late - hold, p = pct(done,T.length);
+  const seg = (c,k) => k ? `<span class="${c}" style="width:${k/T.length*100}%" title="${k}건"></span>` : '';
+  let h = `<div class="ds-sum"><div class="tile"><div class="k">업무 진행</div><div class="v">${p}%</div><div class="s">완료 ${done} / ${T.length}건</div></div>
+  <div class="tile dm"><div class="dm-head"><span class="k">업무 진행도</span><b>${p}%</b><span class="s">${T.length-done}건 남음</span></div>
+  <div class="dm-bar">${seg('ok',done)}${seg('ing',ing)}${seg('bad',late)}${seg('hold',hold)}</div>
+  <div class="dm-scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100%</span></div>
+  <div class="dm-lg"><span><i class="ok"></i>완료 ${done}</span><span><i class="ing"></i>진행중 ${ing}</span><span><i class="bad"></i>지연 ${late}</span>${hold?`<span><i class="hold"></i>보류 ${hold}</span>`:''}<span><i></i>대기 ${wait}</span></div></div></div>`;
+  h += `<div class="panel ds-main"><div class="ds-head"><h3>14단계 진행</h3><span class="note">완료 ${doneSteps} / 14단계 · 업무 ${done} / ${T.length}건${late?` · <b class="bad">지연 ${late}건</b>`:''} · 단계를 누르면 업무가 펼쳐져요</span></div><div class="ds-list">`;
   S.steps.forEach((nm,i)=>{
     const n = i+1, st = stepSt(n), open = openSt.has(n);
     let d, tot, rng, chans, owners, body = '';
@@ -144,16 +152,6 @@ function vDash(){
     h += `<div class="ds-row s-${st} ${open?'open':''}"><button class="ds-top" data-dsopen="${n}" aria-expanded="${open}"><span class="ds-no">${stepNo(n)}</span><span class="ds-nm">${esc(nm)}<small>${rng}${owners.length?' · '+owners.map(esc).join(', '):''}</small></span><span class="ds-chs">${chans}</span><span class="ds-prog"><span class="bar"><i style="width:${pct(d,tot)}%"></i></span><em>${d}/${tot}</em></span><span class="pill st-${st}">${st}</span><span class="ds-caret" aria-hidden="true">${open?'▴':'▾'}</span></button>${open?`<div class="ds-body">${body}</div>`:''}</div>`;
   });
   h += `</div></div>`;
-  // 숫자 4칸
-  const kpiLast = k => { for(const c of [...S.checkpoints].reverse()){ const v=(S.kpi[c.key]||{})[k]; if(v) return v; } return '-'; };
-  const xs = S.exp.filter(xOn), posted = xs.reduce((s,x)=>s+x.people.filter(p=>p.st==='게시완료').length,0), tgt = xs.reduce((s,x)=>s+(+x.target||0),0);
-  const lastCp = [...S.checkpoints].reverse().find(c=>hasPerf(c.key)), tot = chTotals();
-  const sold = lastCp ? S.channels.reduce((s,c)=>s+(((S.perf[lastCp.key]||{})[c.name]||{}).qty||0),0) : null;
-  h += `<div class="tiles ln-t4">
-    <div class="tile"><div class="k">업무 진행</div><div class="v">${pct(done,T.length)}%</div><div class="s">완료 ${done} / ${T.length}건</div></div>
-    <div class="tile"><div class="k">누적 리뷰</div><div class="v">${esc(kpiLast('누적 리뷰 수'))}</div><div class="s">목표 ${esc(S.kpiGoal['누적 리뷰 수']||'-')}</div></div>
-    <div class="tile"><div class="k">체험단 게시</div><div class="v">${posted}건</div><div class="s">목표 ${tgt}건 (진행·검토중)</div></div>
-    <div class="tile"><div class="k">판매</div><div class="v">${sold==null?'-':sold+'대'}</div><div class="s">1개월 목표 ${tot.qty}대${lastCp?' · '+lastCp.name+' 기준':''}</div></div></div>`;
   return h;
 }
 // 업무 = 진행현황표 + 채널별 체크리스트 + 업무 순서 (같은 업무를 보는 세 가지 방법)
