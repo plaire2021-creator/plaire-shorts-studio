@@ -477,3 +477,41 @@
 #launchView .ml-ch{width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #launchView .ml-wk{width:128px;text-align:center}
 #launchView .ml-row .pill{width:52px;text-align:center}
+/* 체험단: 카드 + 펼친 상세 */
+#launchView .xc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#launchView .xc{display:grid;gap:9px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:var(--shadow);font:inherit;text-align:left;color:var(--ink);cursor:pointer}
+#launchView .xc:hover{border-color:var(--line-2)}
+#launchView .xc.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
+#launchView .xc-top{display:flex;align-items:center;gap:8px}
+#launchView .xc-top b{font-size:14.5px}
+#launchView .xc-top .tag{margin-left:auto}
+#launchView .xc-bar{display:flex;align-items:center;gap:10px}
+#launchView .xc-bar .bar{flex:1}
+#launchView .xc-meta{display:flex;justify-content:space-between;font-size:12.5px}
+#launchView .xc-next{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#launchView .xc-next .bad,#launchView .bad{color:var(--red);font-weight:600}
+#launchView .xc-off{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#launchView .xc-off .xc{opacity:.55;box-shadow:none;padding:10px 14px;gap:6px}
+#launchView .xc-off .xc-bar,#launchView .xc-off .xc-meta{display:none}
+#launchView .xc-hint{margin:0}
+#launchView .xd{display:grid;gap:4px}
+#launchView .xd-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#launchView .xd-head b{font-size:16px}
+#launchView .xd-go{margin-left:auto}
+#launchView .xd-set{display:flex;gap:18px;flex-wrap:wrap;padding:8px 0 4px;font-size:12.5px;color:var(--sub)}
+#launchView .xd-set label{display:inline-flex;align-items:center;gap:6px}
+#launchView .xd-num{width:64px;border:1px solid var(--line-2);border-radius:7px;padding:3px 6px;font:inherit;font-size:12.5px;text-align:right}
+#launchView .xd-money{width:100px}
+#launchView .xd-sec{font-weight:700;font-size:13.5px;margin-top:12px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+#launchView .xd-sec .note{font-weight:400;margin-left:6px}
+#launchView .xd-row.done .td-t{color:var(--faint);text-decoration:line-through}
+#launchView .xd-p{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+#launchView .xd-p.cancel{opacity:.5}
+#launchView .xd-in{border:1px solid var(--line-2);border-radius:7px;padding:5px 9px;font:inherit;font-size:12.5px;background:var(--card);color:var(--ink)}
+#launchView .xd-in:first-child{width:170px}
+#launchView .xd-url{flex:1;min-width:140px}
+#launchView .xd-p label{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+#launchView .xd-late{font-size:12px;white-space:nowrap}
+@media (max-width:900px){#launchView .xc-grid{grid-template-columns:1fr}#launchView .xd-p{flex-wrap:wrap}}
+#launchView .td-row input.mc-date{width:auto;height:auto;accent-color:auto;flex:none}
+#launchView input.mc-date{min-width:128px}

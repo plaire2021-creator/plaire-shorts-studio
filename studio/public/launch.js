@@ -265,82 +265,49 @@ function vCheck(){
 }
 
 /* ---------- 탭: 체험단 ---------- */
-function vExp(){
-  let h = `<h2>체험단 운영</h2><p class="lead">체험단은 종류별로 운영 프로세스와 참여자 스케줄을 따로 관리합니다. 시작일을 바꾸면 프로세스 날짜가 함께 바뀝니다.</p>`;
-  h += `<div class="filters"><button class="chip" data-exps="all" aria-pressed="${expSel==='all'}">전체 일정</button>${S.exp.map(x=>`<button class="chip" data-exps="${x.key}" aria-pressed="${expSel===x.key}" style="${xOn(x)?'':'opacity:.55'}">${esc(x.name)}<span class="gob g-${goOf(x)}">${goOf(x)}</span></button>`).join('')}</div>`;
-  if(expSel==='all') return h + vExpAll();
-  const xi = S.exp.findIndex(x=>x.key===expSel), x = S.exp[xi];
-  const d=x.steps.filter(a=>a.st==='완료').length, act=x.people.filter(p=>p.st!=='취소').length, po=x.people.filter(p=>p.st==='게시완료').length;
-  const late = x.steps.filter(a=>xLate(x,a)).length + x.people.filter(pLate).length;
-  h += `<div class="panel"><div class="exphd"><b>${esc(x.name)}</b><span>${esc(x.ch)}</span><span>${esc(x.purpose)}</span><span style="margin-left:auto;display:flex;gap:8px;align-items:center;color:var(--fg)">진행 여부 ${segGo(xi,x)}</span></div>
-    ${goOf(x)==='미진행'?'<div class="offnote">이번 신제품에서는 진행하지 않는 체험단입니다. 캘린더·대시보드·지연 알림에서 빠집니다. 진행하기로 하면 위에서 「진행」을 누르세요.</div>':''}${goOf(x)==='검토중'?'<div class="offnote" style="background:var(--warn-soft);color:var(--warn)">진행 여부를 검토 중입니다. 결정되면 위에서 「진행」 또는 「미진행」을 눌러 주세요.</div>':''}
-    <div class="expset"><label>시작일<input type="date" id="xs-${xi}-start" data-xset="${xi}" data-f="start" value="${x.start}"></label>
-    <label>목표 인원(건)<input type="number" id="xs-${xi}-target" data-xset="${xi}" data-f="target" value="${x.target}" min="0"></label>
-    <label>예산(원)<input type="number" id="xs-${xi}-budget" data-xset="${xi}" data-f="budget" value="${x.budget}" min="0" step="10000"></label>
-    <label>담당${ownerSel(`xs-${xi}-owner`, `data-xset="${xi}" data-f="owner"`, x.owner)}</label></div>
-    <div class="tiles" style="margin:0"><div class="tile"><div class="k">프로세스 진행</div><div class="v">${pct(d,x.steps.length)}%</div><div class="s">${d} / ${x.steps.length}단계 완료</div></div>
-    <div class="tile"><div class="k">참여자</div><div class="v">${act}명</div><div class="s">목표 ${x.target}명</div></div>
-    <div class="tile"><div class="k">게시 완료</div><div class="v">${po}건</div><div class="s">달성률 ${pct(po,x.target)}%</div></div>
-    <div class="tile ${late?'alert':''}"><div class="k">일정 지난 항목</div><div class="v">${late}건</div><div class="s">프로세스 + 게시 예정일</div></div></div></div>`;
-  // 운영 프로세스
-  h += `<div class="panel" style="margin-top:16px"><h3>① 운영 프로세스</h3><div class="tw"><table><thead><tr><th>No</th><th>단계</th><th>기간</th><th>담당</th><th>상태</th><th>메모</th><th></th></tr></thead><tbody>`;
-  x.steps.forEach((st,si)=>{ if(!xMine(st)) return; const lt=xLate(x,st), key=xi+'-'+si;
-    h += `<tr class="${st.st==='완료'?'done':(lt?'late':'')}"><td class="stepc"><b>${stepNo(si+1)}</b></td>
-      <td style="min-width:240px"><input type="text" id="xp-${key}-name" data-xp="${key}" data-f="name" value="${esc(st.name)}">${lt?`<span class="pill st-지연" style="margin-top:3px">지연 ${Math.round((parse(TODAY)-parse(xEnd(x,st)))/864e5)}일</span>`:''}</td>
-      <td>${expEdit===key?`<div class="pedit"><input type="date" id="xp-${key}-ds" data-xpd="${key}" data-f="s" value="${xStart(x,st)}" aria-label="시작일"><input type="date" id="xp-${key}-de" data-xpd="${key}" data-f="e" value="${xEnd(x,st)}" aria-label="마감일"><button class="btn small" id="xpDone">확인</button></div>`:`<button class="period" data-xper="${key}" title="눌러서 날짜 변경">${kdr(xStart(x,st),xEnd(x,st))}</button>`}</td>
-      <td style="min-width:96px">${ownerSel(`xp-${key}-owner`, `data-xp="${key}" data-f="owner"`, st.owner)}</td>
-      <td style="min-width:96px"><select id="xp-${key}-st" data-xp="${key}" data-f="st" class="s-${st.st}">${EXPST.map(o=>`<option ${o===st.st?'selected':''}>${o}</option>`).join('')}</select></td>
-      <td style="min-width:150px"><input type="text" id="xp-${key}-memo" data-xp="${key}" data-f="memo" value="${esc(st.memo||'')}"></td>
-      <td><button class="btn small ghost" data-xpdel="${key}" aria-label="단계 삭제">✕</button></td></tr>`; });
-  h += `</tbody></table></div><div style="margin-top:10px"><button class="btn small" data-xpadd="${xi}">+ 단계 추가</button></div></div>`;
-  // 참여자 스케줄표
-  h += `<div class="panel" style="margin-top:16px"><h3>② 참여자 스케줄표</h3><p class="note" style="margin:0 0 8px">게시 예정일이 지났는데 게시완료가 아니면 빨간색, 게시완료는 초록색으로 표시됩니다.</p><div class="tw"><table><thead><tr><th>이름·계정</th><th>발송일</th><th>게시 예정일</th><th>게시일</th><th>상태</th><th>게시물 URL</th><th>메모</th><th></th></tr></thead><tbody>`;
-  if(!x.people.length) h += `<tr><td colspan="8" class="empty">아직 등록된 참여자가 없습니다. 아래 「+ 참여자 추가」로 선정된 사람을 넣으세요.</td></tr>`;
-  x.people.forEach((p,pi)=>{ const key=xi+'-'+pi, lt=pLate(p);
-    h += `<tr class="${p.st==='게시완료'?'posted':(p.st==='취소'?'cancel':(lt?'late':''))}">
-      <td style="min-width:140px"><input type="text" id="xq-${key}-name" data-xq="${key}" data-f="name" value="${esc(p.name)}" placeholder="이름 / @계정"></td>
-      <td><input type="date" id="xq-${key}-ship" data-xq="${key}" data-f="ship" value="${p.ship||''}"></td>
-      <td><input type="date" id="xq-${key}-plan" data-xq="${key}" data-f="plan" value="${p.plan||''}">${lt?'<span class="pill st-지연" style="margin-top:3px">게시 지연</span>':''}</td>
-      <td><input type="date" id="xq-${key}-posted" data-xq="${key}" data-f="posted" value="${p.posted||''}"></td>
-      <td style="min-width:96px"><select id="xq-${key}-st" data-xq="${key}" data-f="st">${PST.map(o=>`<option ${o===p.st?'selected':''}>${o}</option>`).join('')}</select></td>
-      <td style="min-width:150px"><input type="text" id="xq-${key}-url" data-xq="${key}" data-f="url" value="${esc(p.url||'')}" placeholder="https://"></td>
-      <td style="min-width:130px"><input type="text" id="xq-${key}-memo" data-xq="${key}" data-f="memo" value="${esc(p.memo||'')}"></td>
-      <td><button class="btn small ghost" data-xqdel="${key}" aria-label="참여자 삭제">✕</button></td></tr>`; });
-  h += `</tbody></table></div><div style="margin-top:10px"><button class="btn small" data-xqadd="${xi}">+ 참여자 추가</button></div></div>`;
-  return h;
+// 체험단: 종류마다 카드 한 장 → 누르면 아래에 운영 단계(체크 목록)와 참여자. 표·전용 달력은 없앴다 (마감은 일정 탭 달력에 나옴)
+let expOpen = null;
+const GO_TAG = {진행:'green', 검토중:'amber', 미진행:''};
+function expCard(x, xi){
+  const go = goOf(x), tot = x.steps.length, d = x.steps.filter(a=>a.st==='완료'||a.st==='보류').length;
+  const po = x.people.filter(p=>p.st==='게시완료').length, late = xOn(x) && x.steps.some(a=>xLate(x,a));
+  const r = tot ? {a:addD(x.start,Math.min(...x.steps.map(a=>a.s))), b:addD(x.start,Math.max(...x.steps.map(a=>a.e)))} : null;
+  const nx = x.steps.find(a=>a.st!=='완료'&&a.st!=='보류');
+  const next = go==='검토중' ? '<span class="note">진행할지 정해 주세요</span>' : go==='미진행' ? '<span class="note">이번 제품은 진행 안 함</span>'
+    : nx ? `다음 · ${esc(nx.name)} <span class="${xLate(x,nx)?'bad':'note'}">~${md(xEnd(x,nx))}${xLate(x,nx)?' 지남':''}</span>` : '<span class="note">모두 끝났어요</span>';
+  return `<button class="xc ${expOpen===x.key?'on':''} ${go==='미진행'?'off':''}" data-xopen="${x.key}">
+    <span class="xc-top"><b>${esc(x.name)}</b><span class="note">${esc(x.ch)}</span><span class="tag ${GO_TAG[go]}">${go}</span></span>
+    <span class="xc-bar"><span class="bar"><i style="width:${pct(d,tot)}%"></i></span><span class="note">${d}/${tot}단계</span></span>
+    <span class="xc-meta"><span>게시 ${po} / ${x.target}건</span><span class="note">${r?md(r.a)+' ~ '+md(r.b):''}</span></span>
+    <span class="xc-next ${late?'late':''}">${next}</span></button>`;
 }
-function vExpAll(){
-  const gc = g => S.exp.filter(x=>goOf(x)===g).length;
-  let h = `<div class="panel"><h3>체험단 진행 여부 · 요약</h3><div class="gosum"><span class="gob g-진행">진행 ${gc('진행')}</span><span class="gob g-검토중">검토중 ${gc('검토중')}</span><span class="gob g-미진행">미진행 ${gc('미진행')}</span><span class="note">종류마다 진행 여부를 고르면 캘린더·대시보드에 바로 반영됩니다. 미진행은 일정에서 빠집니다.</span></div><div class="tw"><table class="xsum"><thead><tr><th>종류</th><th>진행 여부</th><th>채널</th><th>기간</th><th class="num">프로세스</th><th class="num">참여자 / 목표</th><th class="num">게시 완료</th><th>지금 할 일</th></tr></thead><tbody>`;
-  S.exp.forEach((x,xi)=>{ const d=x.steps.filter(a=>a.st==='완료').length, act=x.people.filter(p=>p.st!=='취소').length, po=x.people.filter(p=>p.st==='게시완료').length;
-    const nx = xOn(x) ? x.steps.find(a=>a.st!=='완료'&&a.st!=='보류') : null, r=x.steps.length?{a:addD(x.start,Math.min(...x.steps.map(a=>a.s))),b:addD(x.start,Math.max(...x.steps.map(a=>a.e)))}:null;
-    h += `<tr class="${xOn(x)?'':'off'}"><td><button class="mgr" style="margin:0" data-exps="${x.key}">${esc(x.name)}</button></td><td style="opacity:1">${segGo(xi,x)}</td><td class="note">${esc(x.ch)}</td><td class="note" style="white-space:nowrap">${r?kdr(r.a,r.b):''}</td><td class="num">${d}/${x.steps.length}</td><td class="num">${act}/${x.target}명</td><td class="num">${po}건</td><td>${nx?`${esc(nx.name)} <span class="note">(${kdr(xStart(x,nx),xEnd(x,nx))})</span>${xLate(x,nx)?' <span class="pill st-지연">지연</span>':''}`:(xOn(x)?'<span class="note">모두 완료</span>':'<span class="note">진행 안 함</span>')}</td></tr>`; });
-  h += `</tbody></table></div></div>`;
-  const xr = expRange(); if(!xr) return h;
-  const XC = i => `var(--x${i%4})`;
-  if(!expMonth) expMonth = (TODAY>=xr.a && TODAY<=xr.b ? TODAY : xr.a).slice(0,7);
-  const [y,m] = expMonth.split('-').map(Number);
-  const first = Date.UTC(y,m-1,1), startDow = new Date(first).getUTCDay();
-  // 날짜별 일정 모으기: 단계 시작(▶)·마감(■)·하루짜리(●), 참여자 게시 예정(★)
-  const ev = {}; const add=(d,o)=>{(ev[d]=ev[d]||[]).push(o);};
-  S.exp.forEach((x,xi)=>{ if(expHide[x.key] || !xOn(x)) return; const tent = goOf(x)==='검토중';
-    x.steps.forEach((st,si)=>{ const lt=xLate(x,st), base={xi,x,tent,done:st.st==='완료',late:lt,full:`${tent?'(검토중) ':''}[${x.name}] ${stepNo(si+1)} ${st.name} (${kdr(xStart(x,st),xEnd(x,st))} · ${lt?'지연':st.st})`};
-      if(st.s===st.e) add(xStart(x,st),{...base,mk:'●',txt:st.name});
-      else { add(xStart(x,st),{...base,mk:'▶',txt:st.name}); add(xEnd(x,st),{...base,mk:'■',txt:st.name}); } });
-    x.people.forEach(p=>{ if(p.plan && p.st!=='취소') add(p.plan,{xi,x,tent,done:p.st==='게시완료',late:pLate(p),post:1,mk:'★',txt:'게시 예정 · '+(p.name||'참여자'),full:`[${x.name}] 게시 예정 · ${p.name||'참여자'} (${kd(p.plan)} · ${p.st})`}); }); });
-  h += `<div class="panel" style="margin-top:16px"><h3>체험단 전체 스케줄</h3>
-    <div class="calhd"><button class="btn small" id="xcPrev" aria-label="이전 달">◀</button><b>${y}년 ${m}월</b><button class="btn small" id="xcNext" aria-label="다음 달">▶</button><button class="btn small" id="xcToday">오늘</button><button class="btn small" id="xcStart">체험단 시작월</button>
-    <span style="flex:1"></span>${S.exp.map((x,xi)=>xOn(x)?`<button class="xtag" data-xhide="${x.key}" aria-pressed="${!expHide[x.key]}"><i style="background:${XC(xi)}"></i>${esc(x.name)}${goOf(x)==='검토중'?' <span class="gob g-검토중">검토중</span>':''}</button>`:'').join('')}</div>
-    <div class="tw"><div class="cal" style="min-width:680px">${WD.map(w=>`<div class="wd">${w}</div>`).join('')}`;
-  const cells = (startDow + new Date(Date.UTC(y,m,0)).getUTCDate()) > 35 ? 42 : 35;
-  for(let i=0;i<cells;i++){
-    const t = first + (i-startDow)*864e5, d = fmt(t), dt = new Date(t), out = dt.getUTCMonth()!==m-1;
-    const list = (ev[d]||[]).sort((a,b)=>a.xi-b.xi);
-    h += `<div class="day ${out?'out':''} ${d===TODAY?'today':''}"><div class="dn"><span>${dt.getUTCDate()}</span><em>${list.length?list.length+'건':''}</em></div>`;
-    list.forEach(e=>{ h += `<span class="xev ${e.tent?'tent':''} ${e.done?'done':''} ${e.late&&!e.done?'late':''} ${e.post?'post':''}" style="border-left-color:${XC(e.xi)}" title="${esc(e.full)}"><b style="color:${XC(e.xi)}">${e.mk}</b> ${esc(e.txt)}</span>`; });
-    h += `</div>`;
-  }
-  h += `</div></div><div class="legend"><span>▶ 시작</span><span>■ 마감</span><span>● 하루 일정</span><span>★ 참여자 게시 예정</span><span>빨간 배경 = 일정 지남</span><span>취소선 = 완료</span><span>점선·기울임 = 진행 검토중</span><span>미진행 체험단은 표시하지 않습니다.</span><span>색 버튼을 누르면 해당 체험단을 숨기거나 보입니다. 일정에 마우스를 올리면 전체 내용이 보입니다.</span></div></div>`;
+function vExp(){
+  const list = S.exp.map((x,xi)=>({x,xi})), on = list.filter(o=>goOf(o.x)!=='미진행'), off = list.filter(o=>goOf(o.x)==='미진행');
+  let h = `<div class="xc-grid">${on.map(o=>expCard(o.x,o.xi)).join('')}</div>`;
+  if(off.length) h += `<div class="xc-off"><span class="note">진행 안 함</span>${off.map(o=>expCard(o.x,o.xi)).join('')}</div>`;
+  const xi = S.exp.findIndex(x=>x.key===expOpen);
+  if(xi < 0) return h + `<p class="note xc-hint">카드를 누르면 운영 단계와 참여자를 볼 수 있어요.</p>`;
+  const x = S.exp[xi];
+  h += `<div class="panel xd"><div class="xd-head"><b>${esc(x.name)}</b><span class="note">${esc(x.purpose||'')}</span><span class="xd-go">${segGo(xi,x)}</span></div>
+    <div class="xd-set"><label>시작 <input type="date" class="mc-date" data-xset="${xi}" data-f="start" value="${x.start}"></label>
+    <label>목표 <input type="number" class="xd-num" data-xset="${xi}" data-f="target" value="${x.target}" min="0"> 건</label>
+    <label>예산 <input type="number" class="xd-num xd-money" data-xset="${xi}" data-f="budget" value="${x.budget}" min="0" step="10000"> 원</label></div>
+    <div class="xd-sec">운영 단계</div>`;
+  x.steps.forEach((st,si)=>{
+    const lt = xLate(x,st), s2 = lt ? '지연' : st.st, key = xi+'-'+si;
+    h += `<div class="td-row xd-row ${st.st==='완료'?'done':''}"><input type="checkbox" id="xk-${key}" data-xck="${key}" ${st.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(st.name)}</span>${ownerSel(`xo-${key}`, `class="td-owner" data-xp="${key}" data-f="owner"`, st.owner)}<input type="date" class="mc-date" data-xpd="${key}" data-f="e" value="${xEnd(x,st)}" aria-label="${esc(st.name)} 마감일"><button class="pill st-${s2} hold-t" data-xhold="${key}" title="${st.st==='보류'?'누르면 보류를 풀어요':'누르면 보류로 바꿔요'}">${s2}</button></div>`;
+  });
+  h += `<div class="xd-sec">참여자 <span class="note">${x.people.filter(p=>p.st!=='취소').length} / ${x.target}명 · 게시물 링크를 넣으면 게시완료로 바뀌어요</span></div>`;
+  x.people.forEach((p,pi)=>{
+    const key = xi+'-'+pi, lt = pLate(p);
+    h += `<div class="xd-p ${p.st==='게시완료'?'done':''} ${p.st==='취소'?'cancel':''}"><input type="text" class="xd-in" data-xq="${key}" data-f="name" value="${esc(p.name)}" placeholder="이름 / @계정" aria-label="이름">
+      <label class="note">게시 예정 <input type="date" class="mc-date" data-xq="${key}" data-f="plan" value="${p.plan||''}"></label>
+      ${p.url?`<a class="td-open" href="${esc(p.url)}" target="_blank" rel="noopener">열기 ↗</a>`:''}<input type="url" class="xd-in xd-url" data-xq="${key}" data-f="url" value="${esc(p.url||'')}" placeholder="게시물 링크 붙여넣기" aria-label="게시물 링크">
+      <select class="td-owner" data-xq="${key}" data-f="st" aria-label="상태">${PST.map(o=>`<option ${o===p.st?'selected':''}>${o}</option>`).join('')}</select>${lt?'<span class="bad xd-late">게시 지연</span>':''}
+      <button class="btn small ghost" data-xqdel="${key}" aria-label="참여자 삭제">✕</button></div>`;
+  });
+  if(!x.people.length) h += `<p class="note">아직 참여자가 없어요.</p>`;
+  h += `<div class="ds-foot"><button class="btn small" data-xqadd="${xi}">+ 참여자 추가</button></div></div>`;
   return h;
 }
 
@@ -577,6 +544,10 @@ document.addEventListener('click', e=>{
   if(b.id==='xcPrev'||b.id==='xcNext'){ let [y,m]=expMonth.split('-').map(Number); m+= b.id==='xcNext'?1:-1; if(m<1){m=12;y--;} if(m>12){m=1;y++;} expMonth=y+'-'+String(m).padStart(2,'0'); render(); return; }
   if(b.id==='xcToday'){ expMonth=TODAY.slice(0,7); render(); return; }
   if(b.id==='xcStart'){ const r=expRange(); if(r) expMonth=r.a.slice(0,7); render(); return; }
+  if(b.dataset.xopen){ expOpen = expOpen===b.dataset.xopen ? null : b.dataset.xopen; render(); return; }
+  if(b.dataset.xhold){ const [xi,si]=b.dataset.xhold.split('-').map(Number), st=S.exp[xi].steps[si];
+    if(st.st==='보류') st.st=(st._prev&&st._prev!=='보류')?st._prev:'대기'; else { defp(st,'_prev',st.st); st.st='보류'; }
+    markDirty(); render(); return; }
   if(b.dataset.goi!=null){ S.exp[+b.dataset.goi].go=b.dataset.go; markDirty(); render(); return; }
   if(b.dataset.xhide){ const k=b.dataset.xhide; expHide[k]=!expHide[k]; render(); return; }
   if(b.dataset.xper){ expEdit=b.dataset.xper; render('xp-'+expEdit+'-ds'); return; }
@@ -650,7 +621,8 @@ document.addEventListener('change', e=>{
   if(ds.xset!=null){ const x=S.exp[+ds.xset]; if(ds.f==='start'){ if(el.value) x.start=el.value; } else x[ds.f]= ds.f==='owner'?el.value:num(el.value); markDirty(); render(); return; }
   if(ds.xpd && el.value){ const [xi,si]=ds.xpd.split('-').map(Number), x=S.exp[xi], st=x.steps[si]; st[ds.f]=Math.round((parse(el.value)-parse(x.start))/864e5); if(st.e<st.s){ if(ds.f==='s') st.e=st.s; else st.s=st.e; } markDirty(); render(el.id); return; }
   if(ds.xp){ const [xi,si]=ds.xp.split('-').map(Number); S.exp[xi].steps[si][ds.f]=el.value; markDirty(); if(ds.f==='st') render(); else renderTop(); return; }
-  if(ds.xq){ const [xi,pi]=ds.xq.split('-').map(Number), p=S.exp[xi].people[pi]; p[ds.f]=el.value; if(ds.f==='posted'&&el.value&&p.st!=='취소') p.st='게시완료'; markDirty(); if(['st','plan','posted'].includes(ds.f)) render(); else renderTop(); return; }
+  if(ds.xq){ const [xi,pi]=ds.xq.split('-').map(Number), p=S.exp[xi].people[pi]; p[ds.f]=el.value; if(ds.f==='posted'&&el.value&&p.st!=='취소') p.st='게시완료';
+    if(ds.f==='url'){ let v=el.value.trim(); if(v && !/^https?:\/\//i.test(v) && /^[^\s]+\.[^\s]+$/.test(v)) v='https://'+v; p.url=v; if(/^https?:\/\/\S+$/i.test(v) && p.st!=='취소'){ p.st='게시완료'; if(!p.posted) p.posted=TODAY; } else if(!v && p.st==='게시완료'){ p.st='확정'; p.posted=''; } } markDirty(); if(['st','plan','posted','url'].includes(ds.f)) render(); else renderTop(); return; }
   if(ds.lnk){ const [ci,ii]=ds.lnk.split('-').map(Number), it=S.checklists[ci].items[ii]; let v=el.value.trim();
     if(v && !/^https?:\/\//i.test(v) && /^[^\s]+\.[^\s]+$/.test(v)) v='https://'+v; // 주소만 붙여넣어도
     it.url = v; if(/^https?:\/\/\S+$/i.test(v)) setDone(it,true); else if(!v && it.st==='완료') it.st='대기';
