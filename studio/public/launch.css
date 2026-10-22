@@ -426,3 +426,37 @@
 #launchView .hold-t{border:0;font:inherit;font-size:11.5px;font-weight:600;cursor:pointer;flex:none}
 #launchView .hold-t:hover{box-shadow:0 0 0 1px var(--red)}
 #launchView .td-row select.td-owner{flex:none;border:1px solid var(--line-2);border-radius:7px;padding:4px 6px;font:inherit;font-size:12px;background:var(--card);color:var(--ink);cursor:pointer}
+/* 일정: 미니멀 달력 */
+#launchView .mc-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#launchView .mc-head b{font-size:16px;min-width:110px;text-align:center}
+#launchView .mc-lg{margin-left:auto;display:flex;gap:14px;font-size:12px;color:var(--sub);flex-wrap:wrap}
+#launchView .mc-lg span{display:inline-flex;align-items:center;gap:5px}
+#launchView .mc-lg i,#launchView .mc-ev i,#launchView .mc-dot{width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;flex:none}
+#launchView .mc-lg i.late,#launchView .mc-ev.late i,#launchView .mc-dot.late{background:var(--red)}
+#launchView .mc-lg i.done,#launchView .mc-ev.done i,#launchView .mc-dot.done{background:var(--line-2)}
+#launchView .mcal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
+#launchView .mc-wd{padding:8px;text-align:center;font-size:12px;font-weight:600;color:var(--faint);border-bottom:1px solid var(--line)}
+#launchView .mc-day{display:flex;flex-direction:column;align-items:stretch;gap:3px;min-height:96px;padding:7px 8px;border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:none;font:inherit;text-align:left;cursor:pointer;min-width:0;color:var(--ink)}
+#launchView .mc-day:nth-child(7n){border-right:0}
+#launchView .mc-day:hover{background:var(--bg)}
+#launchView .mc-day.out{color:var(--faint);background:#fafbfc}
+#launchView .mc-day.out .mc-ev{opacity:.5}
+#launchView .mc-day.launch{background:var(--blue-soft)}
+#launchView .mc-day.today .mc-dn{color:#fff}
+#launchView .mc-day.today .mc-dn::before{content:"";position:absolute;inset:-3px -7px;border-radius:999px;background:var(--ink);z-index:-1}
+#launchView .mc-day.sel{box-shadow:inset 0 0 0 2px var(--blue)}
+#launchView .mc-dn{position:relative;z-index:0;align-self:flex-start;font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;margin-bottom:2px}
+#launchView .mc-dn em{font-style:normal;font-size:11px;font-weight:700;color:var(--blue);margin-left:6px}
+#launchView .mc-day.today .mc-dn em{color:#fff}
+#launchView .mc-ev{display:flex;align-items:center;gap:5px;font-size:11.5px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+#launchView .mc-ev.late{color:var(--red);font-weight:600}
+#launchView .mc-ev.done{color:var(--faint);text-decoration:line-through}
+#launchView .mc-ev.mc-wkly{color:var(--sub)}
+#launchView .mc-more{font-size:11px;color:var(--faint)}
+#launchView .mc-hint{margin:0}
+#launchView .mc-detail h3{margin:0 0 10px}
+#launchView .mc-g{padding:8px 0;border-top:1px solid var(--line)}
+#launchView .mc-gh{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+#launchView .mc-it{display:flex;align-items:center;gap:10px;padding:4px 0 4px 15px;font-size:13px}
+#launchView .mc-it>span:first-child{flex:1;min-width:0}
+#launchView .mc-it.done>span:first-child{color:var(--faint);text-decoration:line-through}

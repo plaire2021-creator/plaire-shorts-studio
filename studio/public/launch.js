@@ -475,67 +475,49 @@ function setColVal(k,v,on){
 }
 function closeDrop(){ if(openCol){ openCol=null; cfQ=''; render(); } }
 
-/* ---------- 탭: 캘린더 ---------- */
-function calEvents(){
-  const ev = {}; const add=(d,o)=>{(ev[d]=ev[d]||[]).push(o);};
-  TK().forEach(t=>{ if(calHide[S.checklists[t._ci].key] || !mine(t)) return;
-    if(t.rec==='weekly'){ for(let n=t.s;n<=t.e;n++){ const d=addD(S.product.launch,n); if(new Date(parse(d)).getUTCDay()===1) add(d,{t,label:t.ch+' · '+bare(t.name),kind:'rec'}); } return; }
-    if(t.s===t.e) add(tStart(t),{t,label:t.ch+' · '+bare(t.name),kind:'one'});
-    else { add(tStart(t),{t,label:'시작 · '+t.ch+' '+bare(t.name),kind:'s'}); add(tEnd(t),{t,label:'마감 · '+t.ch+' '+bare(t.name),kind:'e'}); }
+/* ---------- 탭: 일정 (달력) ---------- */
+// 칸에는 '마감'만, 같은 날 같은 단계는 한 줄로 묶는다. 매주 반복 업무는 월요일에 '주간 체크' 한 줄. 날짜를 누르면 아래에 그날 업무.
+let calSel = null;
+function calDays(){
+  const days = {}, L = S.product.launch;
+  const grp = (d,k,o) => { const m = (days[d] = days[d] || new Map()); if(!m.has(k)) m.set(k, {...o, items:[]}); return m.get(k); };
+  TK().forEach(t=>{
+    const it = {name:bare(t.name), ch:t.ch, owner:t.owner, st:t.st, late:isLate(t)};
+    if(t.rec==='weekly'){ for(let n=Math.max(0,t.s); n<=t.e; n++){ const d = addD(L,n); if(new Date(parse(d)).getUTCDay()===1) grp(d,'w',{order:99, label:'주간 체크', weekly:1}).items.push({...it, late:false}); } return; }
+    grp(tEnd(t), 's'+t.step, {order:t.step||98, label:stepNo(t.step)+' '+stepName(t.step)}).items.push(it);
   });
-  if(!calHide.__cp) S.checkpoints.forEach(c=>add(addD(S.product.launch,c.d),{t:null,label:'성과 점검 · '+c.name,kind:'cp'}));
-  if(!calHide.__exp) S.exp.filter(xOn).forEach(x=>{ x.steps.forEach(st=>{ if(!xMine(st)) return; const t={st:xLate(x,st)?'지연':st.st,ch:x.name,isExp:1}; const nm='['+x.name+'] '+st.name;
-      if(st.s===st.e) add(xStart(x,st),{t,label:nm,kind:'x'}); else { add(xStart(x,st),{t,label:'시작 · '+nm,kind:'x'}); add(xEnd(x,st),{t,label:'마감 · '+nm,kind:'x'}); } });
-    x.people.forEach(p=>{ if(p.plan && p.st!=='취소') add(p.plan,{t:{st:p.st==='게시완료'?'완료':(pLate(p)?'지연':'대기'),ch:x.name,isExp:1},label:'['+x.name+'] 게시 예정 · '+(p.name||'참여자'),kind:'x'}); }); });
-  return ev;
+  const xn = EXPN();
+  S.exp.filter(x=>goOf(x)==='진행').forEach(x=>x.steps.forEach(st=>{ // '검토중' 체험단은 달력에 안 넣는다
+    grp(xEnd(x,st), 'x', {order:xn, label:stepNo(xn)+' '+(S.steps[xn-1]||'체험단')}).items.push({name:'['+x.name+'] '+st.name, ch:x.ch, owner:st.owner, st:st.st, late:xLate(x,st)});
+  }));
+  for(const m of Object.values(days)) for(const g of m.values()){
+    const closed = g.items.every(i=>i.st==='완료'||i.st==='보류');
+    g.state = closed ? 'done' : g.items.some(i=>i.late) ? 'late' : 'todo';
+  }
+  return days;
 }
 function vCal(){
   if(!calMonth) calMonth = TODAY.slice(0,7);
   const [y,m] = calMonth.split('-').map(Number);
-  const first = Date.UTC(y,m-1,1), startDow = new Date(first).getUTCDay();
-  const ev = calEvents();
-  let h = `<h2>일정 캘린더</h2><p class="lead">업무 시작일과 마감일, 매주 월요일 반복 점검, 성과 점검일을 달력에 표시합니다. 아래 플랫폼 버튼으로 보고 싶은 플랫폼만 켜고 끌 수 있습니다.</p>`;
-  const onlyKey = (()=>{ const keys=[...S.checklists.map(c=>c.key),'__exp','__cp']; const on=keys.filter(k=>!calHide[k]); return on.length===1?on[0]:null; })();
-  h += `<div class="panel" style="padding:12px 14px;margin-bottom:12px"><div class="calhd" style="margin:0 0 8px"><b style="min-width:0;text-align:left;font-size:14px">플랫폼</b>
-    <button class="btn small" id="calAll">전체 보기</button><span class="note">버튼을 누르면 켜고 끕니다 · 이름을 두 번 누르면 그 플랫폼만 봅니다 (달력과 주차별 현황에 함께 적용)</span>
-    <span style="flex:1"></span><span class="note">색 기준</span><span class="lseg"><button data-ccol="st" aria-pressed="${calColor==='st'}">상태</button><button data-ccol="plat" aria-pressed="${calColor==='plat'}">플랫폼</button></span></div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px">${S.checklists.map((c,ci)=>`<button class="xtag" data-cplat="${c.key}" aria-pressed="${!calHide[c.key]}" title="${esc(c.name)}"><i style="background:${pcol(ci)}"></i>${esc(c.name)}<span class="c">${c.items.length}</span></button>`).join('')}
-    <button class="xtag" data-cplat="__exp" aria-pressed="${!calHide.__exp}"><i style="background:var(--wood)"></i>체험단</button><button class="xtag" data-cplat="__cp" aria-pressed="${!calHide.__cp}"><i style="background:var(--wood-soft);border:1px solid var(--wood)"></i>성과 점검</button></div></div>`;
-  h += `<div class="calhd"><button class="btn small" id="calPrev" aria-label="이전 달">◀</button><b>${y}년 ${m}월</b><button class="btn small" id="calNext" aria-label="다음 달">▶</button><button class="btn small" id="calToday">오늘</button><button class="btn small" id="calLaunch">출시월</button></div>`;
-  h += `<div class="tw"><div class="cal" style="min-width:640px">${WD.map(w=>`<div class="wd">${w}</div>`).join('')}`;
+  const first = Date.UTC(y,m-1,1), startDow = new Date(first).getUTCDay(), days = calDays();
   const cells = (startDow + new Date(Date.UTC(y,m,0)).getUTCDate()) > 35 ? 42 : 35;
+  let h = `<div class="mc-head"><button class="btn small" id="calPrev" aria-label="이전 달">◀</button><b>${y}년 ${m}월</b><button class="btn small" id="calNext" aria-label="다음 달">▶</button><button class="btn small" id="calToday">오늘</button>
+    <span class="mc-lg"><span><i class="todo"></i>마감</span><span><i class="late"></i>마감 지남</span><span><i class="done"></i>끝남</span><span>↻ 매주 반복</span></span></div>
+    <div class="mcal">${WD.map(w=>`<div class="mc-wd">${w}</div>`).join('')}`;
   for(let i=0;i<cells;i++){
-    const t = first + (i-startDow)*864e5, d = fmt(t), dt = new Date(t), out = dt.getUTCMonth()!==m-1, n = dnum(d);
-    h += `<div class="day ${out?'out':''} ${d===TODAY?'today':''} ${n===0?'launch':''}"><div class="dn"><span>${dt.getUTCDate()}</span><em>${n>=-7&&n<=90?dlabel(n):''}</em></div>`;
-    (ev[d]||[]).forEach(e=>{
-      if(e.kind==='cp'){ h += `<span class="ev cp">${esc(e.label)}</span>`; return; }
-      const st = e.t.isExp ? e.t.st : (isLate(e.t)?'지연':e.t.st);
-      const bc = calColor==='plat' ? (e.t.isExp?'var(--wood)':pcol(e.t._ci)) : STC[st];
-      h += `<span class="ev ${e.kind==='rec'?'rec':''} ${e.t.st==='완료'?'done':''}" style="border-left-color:${bc}${calColor==='plat'&&st==='지연'?';background:var(--bad-soft)':''}" title="${esc(e.label)} (${esc(e.t.ch)}, ${st})">${esc(e.label)}</span>`; });
-    h += `</div>`;
+    const t = first + (i-startDow)*864e5, d = fmt(t), dt = new Date(t), out = dt.getUTCMonth()!==m-1;
+    const gs = [...(days[d]||new Map()).values()].sort((a,b)=>a.order-b.order);
+    const isL = d===S.product.launch;
+    h += `<button class="mc-day ${out?'out':''} ${d===TODAY?'today':''} ${isL?'launch':''} ${calSel===d?'sel':''}" data-calday="${d}" aria-label="${kd(d)}${gs.length?' 마감 '+gs.length+'개':''}">
+      <span class="mc-dn">${dt.getUTCDate()}${isL?'<em>출시</em>':''}</span>
+      ${gs.slice(0,3).map(g=>`<span class="mc-ev ${g.state} ${g.weekly?'mc-wkly':''}">${g.weekly?'↻':'<i></i>'}${esc(g.label)}</span>`).join('')}${gs.length>3?`<span class="mc-more">+${gs.length-3}</span>`:''}</button>`;
   }
-  h += `</div></div><div class="legend">${calColor==='st'?['대기','진행중','완료','지연','보류'].map(s=>`<span><span class="sw" style="background:${STC[s]}"></span>${s}</span>`).join(''):S.checklists.map((c,ci)=>`<span><span class="sw" style="background:${pcol(ci)}"></span>${esc(c.name)}</span>`).join('')+'<span>빨간 배경 = 지연</span>'}<span><span class="sw" style="background:var(--wood-soft);border:1px solid var(--wood)"></span>성과 점검일</span><span>점선 = 매주 반복</span><span>[ ] = 체험단 일정</span></div>`;
-  // 주차별 업무: 진행현황 기간의 시작일이 속한 주(출시일 = 1주차 첫날), 매주 반복 업무는 해당 기간의 모든 주에 표시
-  const all = TK(), TT = all.filter(t=>!calHide[S.checklists[t._ci].key] && mine(t));
-  const wk = n => Math.floor(n/7)+1, curW = wk(dnum(TODAY));
-  const weeks = {};
-  TT.forEach(t=>{ const w0=Math.max(1,wk(t.s)), w1=Math.max(1,wk(t.e));
-    if(t.rec==='weekly'){ for(let w=w0; w<=w1; w++) (weeks[w]=weeks[w]||[]).push(t); } else (weeks[w0]=weeks[w0]||[]).push(t); });
-  const wl = Object.keys(weeks).map(Number).sort((x,y)=>x-y);
-  const doneAll = TT.filter(t=>t.st==='완료').length;
-  h += `<div class="panel" style="margin-top:16px"><h3>주차별 업무 현황 <span class="note" style="font-weight:400">· 완료 ${doneAll} / ${TT.length}건 · 완료/미완료는 대시보드 체크를 따라 자동으로 바뀝니다</span></h3>
-    <p class="note" style="margin:0 0 12px">업무 기간의 시작일을 기준으로 주차를 나눴습니다(출시일 ${kd(S.product.launch)} = 1주차 첫날). 매주 반복 업무는 해당 주마다 표시됩니다. 상태는 대시보드에서 바꾸세요.</p>
-    <div class="weeks">`;
-  if(!wl.length) h += `<p class="empty">선택한 플랫폼이 없습니다. 위 플랫폼 버튼을 켜 주세요.</p>`;
-  wl.forEach(w=>{ const list = weeks[w].sort((x,y)=>(x.step||99)-(y.step||99)||x._ci-y._ci||x._ii-y._ii);
-    const d = list.filter(t=>t.st==='완료').length, ws = addD(S.product.launch,(w-1)*7), we = addD(S.product.launch,w*7-1);
-    const state = w<curW ? 'past' : (w===curW ? 'now' : 'next');
-    h += `<div class="wk ${state}"><div class="wkside"><div style="display:flex;gap:6px;align-items:baseline"><b>${w}주차</b>${state==='now'?'<span class="pill st-진행중">이번 주</span>':''}</div><span class="note">${md(ws)}(${wd(ws)}) ~ ${md(we)}(${wd(we)})</span>
-      <span class="wkcnt">완료 ${d} / ${list.length}</span><div class="bar"><i style="width:${pct(d,list.length)}%;background:${d===list.length?'var(--ok)':'var(--accent)'}"></i></div></div><div class="wkbody">`;
-    list.forEach(t=>{ const i=all.indexOf(t), done=t.st==='완료', late=isLate(t);
-      h += `<div class="wkrow ${done?'on':(late?'late':'')}"><span class="sn">${stepNo(t.step)}</span><span class="wkch" style="color:${pcol(t._ci)}" title="${esc(t.ch)}">${esc(t.ch)}</span><span class="wkt">${esc(bare(t.name))}${t.rec==='weekly'?' <span class="note">· 매주</span>':''}</span><span class="wkp">${md(tStart(t))}~${md(tEnd(t))}</span><span class="pill ${done?'st-완료':(late?'st-지연':'st-대기')}">${done?'완료':(late?'미완료·지연':'미완료')}</span></div>`; });
-    h += `</div></div>`; });
-  h += `</div></div>`;
+  h += `</div>`;
+  // 고른 날 자세히
+  if(calSel){
+    const gs = [...(days[calSel]||new Map()).values()].sort((a,b)=>a.order-b.order);
+    h += `<div class="panel mc-detail"><h3>${kd(calSel)} (${wd(calSel)})${calSel===S.product.launch?' · 출시일':''}</h3>${gs.length ? gs.map(g=>`<div class="mc-g"><div class="mc-gh"><span class="mc-dot ${g.state}"></span><b>${esc(g.label)}</b><span class="note">${g.items.filter(i=>i.st==='완료'||i.st==='보류').length}/${g.items.length}</span></div>${g.items.map(i=>`<div class="mc-it ${i.st==='완료'?'done':''}"><span>${esc(i.name)}</span><span class="note">${esc(i.ch||'')}${i.owner?' · '+esc(i.owner):''}</span><span class="pill st-${i.late&&i.st!=='완료'&&i.st!=='보류'?'지연':i.st}">${i.late&&i.st!=='완료'&&i.st!=='보류'?'지연':i.st}</span></div>`).join('')}</div>`).join('') : '<p class="note">이날 마감인 업무가 없어요.</p>'}</div>`;
+  } else h += `<p class="note mc-hint">날짜를 누르면 그날 마감인 업무가 아래에 자세히 나와요.</p>`;
   return h;
 }
 
@@ -608,7 +590,8 @@ document.addEventListener('click', e=>{
     window.__lastPlat=k; window.__lastPlatT=now; render(); return; }
   if(b.id==='calAll'){ calHide={}; render(); return; }
   if(b.dataset.ccol){ calColor=b.dataset.ccol; render(); return; }
-  if(b.id==='calToday'){ calMonth=TODAY.slice(0,7); render(); return; }
+  if(b.id==='calToday'){ calMonth=TODAY.slice(0,7); calSel=TODAY; render(); return; }
+  if(b.dataset.calday){ calSel = calSel===b.dataset.calday ? null : b.dataset.calday; render(); return; }
   if(b.id==='calLaunch'){ calMonth=S.product.launch.slice(0,7); render(); return; }
   if(b.id==='addCh'){ S.channels.push({name:'새 채널',price:0,margin:0,qty:0,ad:0,promo:0,etc:0}); markDirty(); render(); return; }
   if(b.dataset.delch!=null){ S.channels.splice(+b.dataset.delch,1); markDirty(); render(); return; }
@@ -758,7 +741,7 @@ function lnRows(title, list, empty){
 async function openProduct(id){
   await flush();
   PID = id; S = null; lookingUp = false; lookErr = ''; VER = 0; rev = savedRev = 0; dirty = false; saveErr = '';
-  calMonth = null; expSel = 'all'; expEdit = ''; expMonth = null; expHide = {}; calHide = {}; CF = {}; openCol = null; editPeriod = -1; delPlat = -1; perfCp = 'W1'; resetArm = false;
+  calMonth = null; calSel = null; expSel = 'all'; expEdit = ''; expMonth = null; expHide = {}; calHide = {}; CF = {}; openCol = null; editPeriod = -1; delPlat = -1; perfCp = 'W1'; resetArm = false;
   try{ await load(); }catch(_){ alert('이 제품을 불러오지 못했어요. 목록을 다시 볼게요.'); return showList(); }
   openSt = new Set(S.steps.map((_,i)=>i+1).filter(n=>n!==EXPN() && stepStatus(n)==='지연'));
   const shAt = Date.parse((S.product.sheet?.at||'').replace(/Z?$/,'Z')) + new Date().getTimezoneOffset()*6e4;
