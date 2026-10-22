@@ -311,3 +311,8 @@
 #launchView .ln-past summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--sub);padding:6px 2px;display:flex;gap:8px;align-items:center}
 #launchView .ln-past[open] summary{margin-bottom:8px}
 @media (max-width:900px){#launchView .td-grid{grid-template-columns:1fr}#launchView .ln-t4{grid-template-columns:repeat(2,minmax(0,1fr))}#launchView .stps{grid-template-columns:repeat(4,minmax(0,1fr))}#launchView .ln-bar{display:none}}
+/* 이 도구의 .chip(채널 로고용 34px 정사각 버튼) 규칙이 매뉴얼 버튼까지 눌러서 글자가 세로로 쪼개지던 것 막기 */
+#launchView .chip{width:auto;height:auto;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;line-height:1.4}
+#launchView .mgr,#launchView .gob,#launchView .lseg button,#launchView .xtag,#launchView .period{white-space:nowrap}
+#launchView td:first-child,#launchView .gl{white-space:nowrap}
+#launchView .xsum{min-width:1060px}#launchView .xsum td:nth-child(3),#launchView .xsum td:nth-child(4){white-space:nowrap}#launchView .xsum td:last-child{min-width:340px}
