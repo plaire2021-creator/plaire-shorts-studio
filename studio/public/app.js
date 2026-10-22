@@ -152,22 +152,27 @@ function newJob() {
   loadActive();
 }
 
-// 진행 중인 영상: 만드는 중이거나, 완성됐지만 아직 채널에 안 올렸거나, 실패한 영상(3일 이내)
+// 최근 기록: 이 화면(제작/업로드)에서 만든 영상 최근 8개 — 만드는 중·올리기 전·올림·실패
 async function loadActive() {
   const mode = uploadMode();
   const jobs = await api("/api/jobs").catch(() => []);
   if (mode !== uploadMode()) return; // 기다리는 사이 다른 화면으로 넘어감
-  const recent = (j) => Date.now() - new Date(j.updated_at || 0) < 3 * 86400000;
   const mine = (j) => (j.kind === "copy") === uploadMode();
-  const list = jobs.filter((j) => mine(j) && (["generating", "queued"].includes(j.status) || (["ready", "failed"].includes(j.status) && !j.uploaded && recent(j))));
-  $("activeJobs").innerHTML = list.length
-    ? `<div class="active-head">진행 중인 영상 <span class="count-badge">${list.length}</span></div>` +
-      list.map((j) => {
-        const [t, c] = j.status === "ready" ? ["완성 · 올리기 전", "green"] : j.status === "failed" ? ["실패 · 열어서 다시 만들기", "red"] : [j.kind === "copy" ? "문구 쓰는 중" : "만드는 중", "amber"];
+  const list = jobs
+    .filter(mine)
+    .sort((x, y) => String(y.updated_at || "").localeCompare(String(x.updated_at || "")))
+    .slice(0, 8);
+  const busy = list.filter((j) => ["generating", "queued"].includes(j.status)).length;
+  $("activeJobs").innerHTML =
+    `<div class="active-head">최근 기록${busy ? ` <span class="count-badge">${busy}</span>` : ""}</div>` +
+    (list.length
+      ? list.map((j) => {
+        const [t, c] = j.status === "ready" ? (j.uploaded ? [`올림 · ${j.uploaded}곳`, "green"] : ["완성 · 올리기 전", "amber"]) : j.status === "failed" ? ["실패 · 열어서 다시 만들기", "red"] : [j.kind === "copy" ? "문구 쓰는 중" : "만드는 중", "amber"];
         return `<div class="active-row ${c}" data-open="${j.id}" role="button" tabindex="0"><span class="name">${esc(j.product_name)}</span><span class="tag ${c}">${t}</span><span class="go">열기</span><button class="del" data-del="${j.id}" data-name="${esc(j.product_name)}" data-making="${j.status !== "ready" && j.status !== "failed" ? 1 : ""}">삭제</button></div>`;
       }).join("")
-    : "";
-  $("activeJobs").classList.toggle("hidden", !list.length || current !== null || $("stepInput").classList.contains("hidden"));
+      : `<p class="active-empty">${uploadMode() ? "아직 올린 영상이 없어요" : "아직 만든 영상이 없어요"}</p>`);
+  const inputShown = !$("stepInput").classList.contains("hidden") || !$("stepCopyInput").classList.contains("hidden");
+  $("activeJobs").classList.toggle("hidden", current !== null || !inputShown);
 }
 $("activeJobs").onclick = async (e) => {
   const d = e.target.closest("[data-del]");
@@ -186,7 +191,7 @@ $("activeJobs").onclick = async (e) => {
   const b = e.target.closest("[data-open]");
   if (b) openJob(b.dataset.open);
 };
-setInterval(() => !current && route.current === "shorts" && loadActive(), 10000);
+setInterval(() => !current && ["shorts", "upload"].includes(route.current) && loadActive(), 10000);
 
 async function openJob(id) {
   current = await api(`/api/jobs/${id}`);
@@ -830,17 +835,18 @@ function wkRender() {
 $("wkAgain").onclick = () => (wkShowInput(), weeklyOpen());
 function wkHistory(runs) {
   const list = (runs || []).filter((r) => r.status !== "running").slice(0, 5);
-  $("wkHistory").innerHTML = list.length
-    ? `<div class="active-head">최근 기록</div>` +
-      list
+  $("wkHistory").innerHTML =
+    `<div class="active-head">최근 기록</div>` +
+    (list.length
+      ? list
         .map((r) => {
           const ok = r.status === "done";
           const total = r.summary?.rows?.find((x) => /합계/.test(x.label))?.values?.[0];
           return `<div class="active-row ${ok ? "green" : "red"}" data-run="${r.id}" role="button" tabindex="0"><span class="name">${esc(r.week?.label || r.id)}${total != null ? ` · 합계 ${won(total)}원` : ""}</span><span class="tag ${ok ? "green" : "red"}">${ok ? "반영 완료" : "멈춤"}</span><span class="go">보기</span></div>`;
         })
         .join("")
-    : "";
-  $("wkHistory").classList.toggle("hidden", !list.length);
+      : `<p class="active-empty">아직 만든 주간 통계가 없어요</p>`);
+  $("wkHistory").classList.remove("hidden");
 }
 $("wkHistory").onclick = (e) => {
   const r = e.target.closest("[data-run]");
@@ -1015,16 +1021,17 @@ document.addEventListener("click", (e) => {
 });
 function rvHistory(runs) {
   const list = (runs || []).filter((r) => !r.running).slice(0, 5);
-  $("rvHistory").innerHTML = list.length
-    ? `<div class="active-head">최근 기록</div>` +
-      list
+  $("rvHistory").innerHTML =
+    `<div class="active-head">최근 기록</div>` +
+    (list.length
+      ? list
         .map((r) => {
           const ok = r.status === "done";
           return `<div class="active-row ${ok ? "green" : "red"}" data-rv="${r.id}" role="button" tabindex="0"><span class="name">${esc(r.source || r.id)} · ${r.total ?? "-"}건${r.low ? ` (5점 미만 ${r.low})` : ""}</span><span class="tag ${ok ? "green" : "red"}">${ok ? "완성" : "멈춤"}</span><span class="go">보기</span><button class="del" data-rvdel="${r.id}">삭제</button></div>`;
         })
         .join("")
-    : "";
-  $("rvHistory").classList.toggle("hidden", !list.length);
+      : `<p class="active-empty">아직 쓴 답글이 없어요</p>`);
+  $("rvHistory").classList.remove("hidden");
 }
 $("rvHistory").onclick = async (e) => {
   const d = e.target.closest("[data-rvdel]");
@@ -1202,17 +1209,18 @@ function mShow() {
 }
 function mHistoryList(runs) {
   const list = (runs || []).filter((r) => !r.running).slice(0, 5);
-  $("mHistory").innerHTML = list.length
-    ? `<div class="active-head">최근 기록</div>` +
-      list
+  $("mHistory").innerHTML =
+    `<div class="active-head">최근 기록</div>` +
+    (list.length
+      ? list
         .map((r) => {
           const ok = r.status === "done";
           const total = (r.summary || []).find((x) => x.label === "합계")?.value;
           return `<div class="active-row ${ok ? "green" : "red"}" data-mrun="${r.id}" role="button" tabindex="0"><span class="name">${esc(r.month?.label || r.id)}${total != null ? ` · 합계 ${won(total)}원` : ""}</span><span class="tag ${ok ? "green" : "red"}">${ok ? "완료" : "멈춤"}</span><span class="go">보기</span></div>`;
         })
         .join("")
-    : "";
-  $("mHistory").classList.toggle("hidden", !list.length);
+      : `<p class="active-empty">아직 만든 월간 통계가 없어요</p>`);
+  $("mHistory").classList.remove("hidden");
 }
 $("mHistory").onclick = (e) => {
   const r = e.target.closest("[data-mrun]");
@@ -1485,16 +1493,17 @@ $("blResult").onclick = async (e) => {
 };
 function blHistory(runs) {
   const list = (runs || []).filter((r) => !r.running).slice(0, 6);
-  $("blHistory").innerHTML = list.length
-    ? `<div class="active-head">최근 기록</div>` +
-      list
+  $("blHistory").innerHTML =
+    `<div class="active-head">최근 기록</div>` +
+    (list.length
+      ? list
         .map((r) => {
           const ok = r.status === "done";
           return `<div class="active-row ${ok ? "green" : "red"}" data-blrun="${r.id}" role="button" tabindex="0"><span class="name">${esc(r.product_name)}${r.result?.keywords?.main ? ` · ${esc(r.result.keywords.main)}` : ""}</span><span class="tag ${ok ? "green" : "red"}">${ok ? "완성" : "멈춤"}</span><span class="go">보기</span><button class="del" data-bldel="${r.id}">삭제</button></div>`;
         })
         .join("")
-    : "";
-  $("blHistory").classList.toggle("hidden", !list.length);
+      : `<p class="active-empty">아직 쓴 블로그 글이 없어요</p>`);
+  $("blHistory").classList.remove("hidden");
 }
 $("blHistory").onclick = async (e) => {
   const d = e.target.closest("[data-bldel]");
