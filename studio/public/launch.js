@@ -69,6 +69,7 @@ const GO = ['진행','검토중','미진행'];
 const goOf = x => x.go || '검토중';
 const xOn = x => goOf(x) !== '미진행';
 const segGo = (xi,x) => `<span class="lseg" role="group" aria-label="${esc(x.name)} 진행 여부">${GO.map(g=>`<button data-go="${g}" data-goi="${xi}" aria-pressed="${goOf(x)===g}">${g}</button>`).join('')}</span>`;
+const posts = x => (x.results||[]).length; // 체험단 결과에 적은 게시 수
 const pLate = p => p.plan && p.plan < TODAY && p.st!=='게시완료' && p.st!=='취소';
 function expRange(){ let a=null,b=null; S.exp.filter(xOn).forEach(x=>x.steps.forEach(st=>{ const s1=xStart(x,st), e1=xEnd(x,st); if(!a||s1<a)a=s1; if(!b||e1>b)b=e1; })); return a?{a,b}:null; }
 const kdr = (a,b) => kd(a)+(b&&b!==a?' ~ '+kd(b):'');
@@ -209,8 +210,8 @@ function vDash(){
       d = all.filter(o=>o.a.st==='완료').length; tot = all.length; rng = r ? md(r.a)+' ~ '+md(r.b) : '진행하는 체험단 없음';
       chans = S.exp.map(x=>`<span class="ds-ch ${goOf(x)==='진행'?'on':''}">${esc(x.name)} <em>${goOf(x)}</em></span>`).join('');
       owners = [...new Set(all.map(o=>o.a.owner).filter(Boolean))];
-      if(open) body = S.exp.map(x=>{ const xd=x.steps.filter(a=>a.st==='완료').length, po=x.people.filter(p=>p.st==='게시완료').length, lt=x.steps.some(a=>xLate(x,a));
-        return `<div class="td-row"><span class="td-t">${esc(x.name)}<small>${esc(x.ch)} · ${goOf(x)}</small></span><span class="td-d ${lt?'bad':''}">${xd}/${x.steps.length}단계 · 게시 ${po}/${x.target}건</span></div>`; }).join('')
+      if(open) body = S.exp.map(x=>{ const xd=x.steps.filter(a=>a.st==='완료').length, po=posts(x), lt=x.steps.some(a=>xLate(x,a));
+        return `<div class="td-row"><span class="td-t">${esc(x.name)}<small>${esc(x.ch)} · ${goOf(x)}</small></span><span class="td-d ${lt?'bad':''}">${xd}/${x.steps.length}단계 · 게시 ${po}건 · 인원 ${x.target}명</span></div>`; }).join('')
         + `<div class="ds-foot"><button class="btn small" data-goexp="all">체험단 탭에서 관리</button></div>`;
     } else {
       const ts = stepTasks(n), r = stepRange(n);
@@ -265,48 +266,63 @@ function vCheck(){
 }
 
 /* ---------- 탭: 체험단 ---------- */
-// 체험단: 종류마다 카드 한 장 → 누르면 아래에 운영 단계(체크 목록)와 참여자. 표·전용 달력은 없앴다 (마감은 일정 탭 달력에 나옴)
+// 체험단: 종류마다 카드 한 장 → 누르면 아래에 참여자·진행 상황·체험단 결과. 표·전용 달력은 없앴다 (마감은 일정 탭 달력에 나옴)
 let expOpen = null;
 const GO_TAG = {진행:'green', 검토중:'amber', 미진행:''};
 function expCard(x, xi){
   const go = goOf(x), tot = x.steps.length, d = x.steps.filter(a=>a.st==='완료'||a.st==='보류').length;
-  const po = x.people.filter(p=>p.st==='게시완료').length, late = xOn(x) && x.steps.some(a=>xLate(x,a));
+  const po = posts(x), late = xOn(x) && x.steps.some(a=>xLate(x,a));
   const r = tot ? {a:addD(x.start,Math.min(...x.steps.map(a=>a.s))), b:addD(x.start,Math.max(...x.steps.map(a=>a.e)))} : null;
   const nx = x.steps.find(a=>a.st!=='완료'&&a.st!=='보류');
   const next = go==='검토중' ? '<span class="note">진행할지 정해 주세요</span>' : go==='미진행' ? '<span class="note">이번 제품은 진행 안 함</span>'
-    : nx ? `다음 · ${esc(nx.name)} <span class="${xLate(x,nx)?'bad':'note'}">~${md(xEnd(x,nx))}${xLate(x,nx)?' 지남':''}</span>` : '<span class="note">모두 끝났어요</span>';
+    : !tot ? '<span class="note">진행 상황을 추가해 주세요</span>' : nx ? `다음 · ${esc(nx.name||'(이름 없음)')} <span class="${xLate(x,nx)?'bad':'note'}">~${md(xEnd(x,nx))}${xLate(x,nx)?' 지남':''}</span>` : '<span class="note">모두 끝났어요</span>';
   return `<button class="xc ${expOpen===x.key?'on':''} ${go==='미진행'?'off':''}" data-xopen="${x.key}">
     <span class="xc-top"><b>${esc(x.name)}</b><span class="note">${esc(x.ch)}</span><span class="tag ${GO_TAG[go]}">${go}</span></span>
-    <span class="xc-bar"><span class="bar"><i style="width:${pct(d,tot)}%"></i></span><span class="note">${d}/${tot}단계</span></span>
-    <span class="xc-meta"><span>게시 ${po} / ${x.target}건</span><span class="note">${r?md(r.a)+' ~ '+md(r.b):''}</span></span>
+    <span class="xc-bar"><span class="bar"><i style="width:${pct(d,tot)}%"></i></span><span class="note">${tot?d+'/'+tot:'진행 상황 없음'}</span></span>
+    <span class="xc-meta"><span>인원 ${x.target}명 · 게시 ${po}건</span><span class="note">${r?md(r.a)+' ~ '+md(r.b):''}</span></span>
     <span class="xc-next ${late?'late':''}">${next}</span></button>`;
 }
 function vExp(){
   // 미진행도 자리는 그대로 두고 카드만 흑백으로
   let h = `<div class="xc-grid">${S.exp.map((x,xi)=>expCard(x,xi)).join('')}</div>`;
   const xi = S.exp.findIndex(x=>x.key===expOpen);
-  if(xi < 0) return h + `<p class="note xc-hint">카드를 누르면 운영 단계와 참여자를 볼 수 있어요.</p>`;
+  if(xi < 0) return h + `<p class="note xc-hint">카드를 누르면 참여자·진행 상황·체험단 결과를 볼 수 있어요.</p>`;
   const x = S.exp[xi];
   h += `<div class="panel xd"><div class="xd-head"><b>${esc(x.name)}</b><span class="note">${esc(x.purpose||'')}</span><span class="xd-go">${segGo(xi,x)}</span></div>
     <div class="xd-set"><label>시작 <input type="date" class="mc-date" data-xset="${xi}" data-f="start" value="${x.start}"></label>
-    <label>목표 <input type="number" class="xd-num" data-xset="${xi}" data-f="target" value="${x.target}" min="0"> 건</label>
-    <label>예산 <input type="number" class="xd-num xd-money" data-xset="${xi}" data-f="budget" value="${x.budget}" min="0" step="10000"> 원</label></div>
-    <div class="xd-sec">운영 단계</div>`;
+    <label>인원 <input type="number" class="xd-num" data-xset="${xi}" data-f="target" value="${x.target}" min="0" max="50"> 명</label>
+    <label>예산 <input type="number" class="xd-num xd-money" data-xset="${xi}" data-f="budget" value="${x.budget}" min="0" step="10000"> 원</label></div>`;
+  // 참여자: 체험단을 하는 사람 기록. 칸 수 = 인원
+  while(x.people.length < (+x.target||0)) x.people.push({name:'', url:''});
+  h += `<div class="xd-sec">참여자 <span class="note">${x.people.filter(p=>p.name||p.url).length} / ${x.target}명</span></div>`;
+  x.people.slice(0, +x.target||0).forEach((p,pi)=>{
+    const key = xi+'-'+pi;
+    h += `<div class="xd-p"><span class="xd-no">${pi+1}</span><input type="text" class="xd-in" data-xq="${key}" data-f="name" value="${esc(p.name||'')}" placeholder="이름 / @계정" aria-label="${pi+1}번 참여자 이름">
+      <input type="url" class="xd-in xd-url" data-xq="${key}" data-f="url" value="${esc(p.url||'')}" placeholder="계정 링크 붙여넣기" aria-label="${pi+1}번 참여자 계정 링크">${p.url?`<a class="td-open" href="${esc(p.url)}" target="_blank" rel="noopener">열기 ↗</a>`:''}</div>`;
+  });
+  if(!(+x.target)) h += `<p class="note">위에서 인원을 정하면 참여자 칸이 생겨요.</p>`;
+  // 진행 상황: 직접 하나씩 추가
+  h += `<div class="xd-sec">진행 상황</div>`;
   x.steps.forEach((st,si)=>{
     const lt = xLate(x,st), s2 = lt ? '지연' : st.st, key = xi+'-'+si;
-    h += `<div class="td-row xd-row ${st.st==='완료'?'done':''}"><input type="checkbox" id="xk-${key}" data-xck="${key}" ${st.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(st.name)}</span>${ownerSel(`xo-${key}`, `class="td-owner" data-xp="${key}" data-f="owner"`, st.owner)}<input type="date" class="mc-date" data-xpd="${key}" data-f="e" value="${xEnd(x,st)}" aria-label="${esc(st.name)} 마감일"><button class="pill st-${s2} hold-t" data-xhold="${key}" title="${st.st==='보류'?'누르면 보류를 풀어요':'누르면 보류로 바꿔요'}">${s2}</button></div>`;
+    h += `<div class="td-row xd-row ${st.st==='완료'?'done':''}"><input type="checkbox" id="xk-${key}" data-xck="${key}" ${st.st==='완료'?'checked':''} aria-label="완료"><input type="text" class="xd-in xd-step" id="xp-${key}-name" data-xp="${key}" data-f="name" value="${esc(st.name)}" placeholder="할 일을 적어 주세요">${ownerSel(`xo-${key}`, `class="td-owner" data-xp="${key}" data-f="owner"`, st.owner)}<input type="date" class="mc-date" data-xpd="${key}" data-f="e" value="${xEnd(x,st)}" aria-label="마감일"><button class="pill st-${s2} hold-t" data-xhold="${key}" title="${st.st==='보류'?'누르면 보류를 풀어요':'누르면 보류로 바꿔요'}">${s2}</button><button class="btn small ghost" data-xpdel="${key}" aria-label="항목 삭제">✕</button></div>`;
   });
-  h += `<div class="xd-sec">참여자 <span class="note">${x.people.filter(p=>p.st!=='취소').length} / ${x.target}명 · 게시물 링크를 넣으면 게시완료로 바뀌어요</span></div>`;
-  x.people.forEach((p,pi)=>{
-    const key = xi+'-'+pi, lt = pLate(p);
-    h += `<div class="xd-p ${p.st==='게시완료'?'done':''} ${p.st==='취소'?'cancel':''}"><input type="text" class="xd-in" data-xq="${key}" data-f="name" value="${esc(p.name)}" placeholder="이름 / @계정" aria-label="이름">
-      <label class="note">게시 예정 <input type="date" class="mc-date" data-xq="${key}" data-f="plan" value="${p.plan||''}"></label>
-      ${p.url?`<a class="td-open" href="${esc(p.url)}" target="_blank" rel="noopener">열기 ↗</a>`:''}<input type="url" class="xd-in xd-url" data-xq="${key}" data-f="url" value="${esc(p.url||'')}" placeholder="게시물 링크 붙여넣기" aria-label="게시물 링크">
-      <select class="td-owner" data-xq="${key}" data-f="st" aria-label="상태">${PST.map(o=>`<option ${o===p.st?'selected':''}>${o}</option>`).join('')}</select>${lt?'<span class="bad xd-late">게시 지연</span>':''}
-      <button class="btn small ghost" data-xqdel="${key}" aria-label="참여자 삭제">✕</button></div>`;
+  if(!x.steps.length) h += `<p class="note">아직 적은 진행 상황이 없어요.</p>`;
+  h += `<div class="ds-foot"><button class="btn small" data-xpadd="${xi}">+ 항목 추가</button></div>`;
+  // 체험단 결과: 누가 어디에 뭘 올렸는지
+  const rs = x.results = x.results || [], names = x.people.map(p=>p.name).filter(Boolean);
+  h += `<div class="xd-sec">체험단 결과 <span class="note">${rs.length}건</span></div>`;
+  rs.forEach((r,ri)=>{
+    const key = xi+'-'+ri;
+    h += `<div class="xd-p"><input type="text" class="xd-in" list="xr-names-${xi}" data-xr="${key}" data-f="who" value="${esc(r.who||'')}" placeholder="누가" aria-label="누가">
+      <input type="text" class="xd-in xd-where" data-xr="${key}" data-f="where" value="${esc(r.where||'')}" placeholder="어디에 (블로그·인스타 등)" aria-label="어디에">
+      <input type="text" class="xd-in xd-url" data-xr="${key}" data-f="what" value="${esc(r.what||'')}" placeholder="무엇을 (게시물 링크나 내용)" aria-label="무엇을">${/^https?:\/\//.test(r.what||'')?`<a class="td-open" href="${esc(r.what)}" target="_blank" rel="noopener">열기 ↗</a>`:''}
+      <input type="date" class="mc-date" data-xr="${key}" data-f="date" value="${r.date||''}" aria-label="올린 날">
+      <button class="btn small ghost" data-xrdel="${key}" aria-label="결과 삭제">✕</button></div>`;
   });
-  if(!x.people.length) h += `<p class="note">아직 참여자가 없어요.</p>`;
-  h += `<div class="ds-foot"><button class="btn small" data-xqadd="${xi}">+ 참여자 추가</button></div></div>`;
+  h += `<datalist id="xr-names-${xi}">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`;
+  if(!rs.length) h += `<p class="note">게시물이 올라오면 하나씩 추가해 주세요.</p>`;
+  h += `<div class="ds-foot"><button class="btn small" data-xradd="${xi}">+ 결과 추가</button></div></div>`;
   return h;
 }
 
@@ -551,8 +567,10 @@ document.addEventListener('click', e=>{
   if(b.dataset.xhide){ const k=b.dataset.xhide; expHide[k]=!expHide[k]; render(); return; }
   if(b.dataset.xper){ expEdit=b.dataset.xper; render('xp-'+expEdit+'-ds'); return; }
   if(b.id==='xpDone'){ expEdit=''; render(); return; }
-  if(b.dataset.xpadd!=null){ const x=S.exp[+b.dataset.xpadd]; const last=x.steps[x.steps.length-1]; const s0=last?last.e:0; x.steps.push({name:'새 단계',s:s0,e:s0,st:'대기',owner:x.owner||'',memo:''}); markDirty(); render('xp-'+b.dataset.xpadd+'-'+(x.steps.length-1)+'-name'); return; }
+  if(b.dataset.xpadd!=null){ const x=S.exp[+b.dataset.xpadd]; const last=x.steps[x.steps.length-1]; const s0=last?last.e:0; const t0=Math.max(0,Math.round((parse(TODAY)-parse(x.start))/864e5)); x.steps.push({name:'',s:t0,e:Math.max(t0,s0),st:'대기',owner:x.owner||'',memo:''}); markDirty(); render('xp-'+b.dataset.xpadd+'-'+(x.steps.length-1)+'-name'); return; }
   if(b.dataset.xpdel){ const [xi,si]=b.dataset.xpdel.split('-').map(Number); S.exp[xi].steps.splice(si,1); expEdit=''; markDirty(); render(); return; }
+  if(b.dataset.xradd!=null){ const x=S.exp[+b.dataset.xradd]; (x.results=x.results||[]).push({who:'',where:'',what:'',date:TODAY}); markDirty(); render(); return; }
+  if(b.dataset.xrdel){ const [xi,ri]=b.dataset.xrdel.split('-').map(Number); S.exp[xi].results.splice(ri,1); markDirty(); render(); return; }
   if(b.dataset.xqadd!=null){ const x=S.exp[+b.dataset.xqadd]; x.people.push({name:'',ship:'',plan:'',posted:'',st:'섭외중',url:'',memo:''}); markDirty(); render('xq-'+b.dataset.xqadd+'-'+(x.people.length-1)+'-name'); return; }
   if(b.dataset.xqdel){ const [xi,pi]=b.dataset.xqdel.split('-').map(Number); S.exp[xi].people.splice(pi,1); markDirty(); render(); return; }
   if(b.dataset.cp){ perfCp=b.dataset.cp; render(); return; }
@@ -617,11 +635,17 @@ document.addEventListener('change', e=>{
   const el = e.target, ds = el.dataset;
   if(el.id==='cfall'){ if(el.checked) delete CF[openCol]; else CF[openCol]=[]; render(); return; }
   if(ds.cfv!=null){ setColVal(openCol, ds.cfv, el.checked); render(); return; }
-  if(ds.xset!=null){ const x=S.exp[+ds.xset]; if(ds.f==='start'){ if(el.value) x.start=el.value; } else x[ds.f]= ds.f==='owner'?el.value:num(el.value); markDirty(); render(); return; }
+  if(ds.xset!=null){ const x=S.exp[+ds.xset]; if(ds.f==='start'){ if(el.value) x.start=el.value; } else x[ds.f]= ds.f==='owner'?el.value:num(el.value);
+    if(ds.f==='target'){ const n=Math.max(0,Math.min(50,Math.round(x.target)||0)); x.target=n; const cut=x.people.slice(n).filter(p=>p.name||p.url);
+      if(cut.length && !confirm(`참여자 ${cut.length}명이 적혀 있는 칸이 지워져요. 인원을 줄일까요?`)){ x.target=x.people.length; render(); return; }
+      x.people=x.people.slice(0,n); } markDirty(); render(); return; }
   if(ds.xpd && el.value){ const [xi,si]=ds.xpd.split('-').map(Number), x=S.exp[xi], st=x.steps[si]; st[ds.f]=Math.round((parse(el.value)-parse(x.start))/864e5); if(st.e<st.s){ if(ds.f==='s') st.e=st.s; else st.s=st.e; } markDirty(); render(el.id); return; }
   if(ds.xp){ const [xi,si]=ds.xp.split('-').map(Number); S.exp[xi].steps[si][ds.f]=el.value; markDirty(); if(ds.f==='st') render(); else renderTop(); return; }
+  if(ds.xr){ const [xi,ri]=ds.xr.split('-').map(Number), r=S.exp[xi].results[ri]; let v=el.value.trim();
+    if(ds.f==='what' && v && !/^https?:\/\//i.test(v) && /^[^\s]+\.[a-z]{2,}(\/\S*)?$/i.test(v)) v='https://'+v;
+    r[ds.f]=v; markDirty(); if(ds.f==='what') render(); else renderTop(); return; }
   if(ds.xq){ const [xi,pi]=ds.xq.split('-').map(Number), p=S.exp[xi].people[pi]; p[ds.f]=el.value; if(ds.f==='posted'&&el.value&&p.st!=='취소') p.st='게시완료';
-    if(ds.f==='url'){ let v=el.value.trim(); if(v && !/^https?:\/\//i.test(v) && /^[^\s]+\.[^\s]+$/.test(v)) v='https://'+v; p.url=v; if(/^https?:\/\/\S+$/i.test(v) && p.st!=='취소'){ p.st='게시완료'; if(!p.posted) p.posted=TODAY; } else if(!v && p.st==='게시완료'){ p.st='확정'; p.posted=''; } } markDirty(); if(['st','plan','posted','url'].includes(ds.f)) render(); else renderTop(); return; }
+    if(ds.f==='url'){ let v=el.value.trim(); if(v && !/^https?:\/\//i.test(v) && /^[^\s]+\.[^\s]+$/.test(v)) v='https://'+v; p.url=v; } markDirty(); if(['st','plan','posted','url'].includes(ds.f)) render(); else renderTop(); return; }
   if(ds.lnk){ const [ci,ii]=ds.lnk.split('-').map(Number), it=S.checklists[ci].items[ii]; let v=el.value.trim();
     if(v && !/^https?:\/\//i.test(v) && /^[^\s]+\.[^\s]+$/.test(v)) v='https://'+v; // 주소만 붙여넣어도
     it.url = v; if(/^https?:\/\/\S+$/i.test(v)) setDone(it,true); else if(!v && it.st==='완료') it.st='대기';
