@@ -130,7 +130,7 @@ window.addEventListener("focus", () => loadStatus(true));
 const uploadMode = () => route.current === "upload"; // 제작된 숏츠 업로드 화면
 function show(ids) {
   if (["shorts", "upload"].includes(route.current)) $("crumb").textContent = ids.includes("settings") ? "숏츠 설정" : ids.includes("stepInput") ? (uploadMode() ? "새 업로드" : "새 영상") : current?.product_name || "영상";
-  $("shortsSettingsBtn").classList.toggle("on", ids.includes("settings"));
+  $("settingsBtn").classList.toggle("on", ids.includes("settings"));
   for (const s of ["stepInput", "stepProgress", "stepResult", "stepUpload", "settings"]) $(s).classList.toggle("hidden", !ids.includes(s));
   if (!ids.includes("stepInput")) $("activeJobs").classList.add("hidden");
   setTimeout(pauseHidden);
@@ -539,8 +539,8 @@ async function openSettings() {
   if (status?.local !== false) await loadAdmin();
   show(["settings"]);
 }
-$("settingsBtn").onclick = () => go("settings"); // 업무 도구 전체 설정
-$("shortsSettingsBtn").onclick = () => openSettings(); // 숏츠 채널·앱 설정
+// 톱니바퀴: 홈에서는 업무 도구 전체 설정, 숏츠 두 탭에서는 숏츠 설정
+$("settingsBtn").onclick = () => (["shorts", "upload"].includes(route.current) ? openSettings() : go("settings"));
 $("topNewBtn").onclick = newJob;
 $("home").onclick = (e) => (e.preventDefault(), go("home"));
 
@@ -578,6 +578,7 @@ function route() {
   $("reviewView").classList.toggle("hidden", name !== "review-reply");
   $("monthlyView").classList.toggle("hidden", name !== "monthly-sales");
   $("settingsView").classList.toggle("hidden", name !== "settings");
+  $("settingsBtn").classList.toggle("hidden", !["home", "settings", "shorts", "upload"].includes(name));
   $("settingsBtn").classList.toggle("on", name === "settings");
   if (name === "settings") loadTeam();
   $("placeholderView").classList.toggle("hidden", isShorts || ["home", "weekly-sales", "review-reply", "monthly-sales", "settings"].includes(name));
