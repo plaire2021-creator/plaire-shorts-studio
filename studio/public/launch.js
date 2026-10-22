@@ -669,12 +669,11 @@ async function delProduct(id, name){
 
 /* ---------- 시작 ---------- */
 try{ const t=localStorage.getItem('fleur-launch-tab'); if(t && TABS.some(x=>x[0]===t)) tab=t; }catch(_){}
-// 사이드바에서 이 화면을 열면: 보던 제품이 있으면 최신 내용으로 다시 그리고, 없으면 제품 목록
+// 사이드바·홈에서 이 화면을 열면 늘 제품 목록부터 (보던 제품의 남은 변경은 먼저 저장)
 window.launchOpen = async function(){
   if(!ROOT.dataset.ready){ shell(); ROOT.dataset.ready = '1'; }
-  if(!PID) return showList();
-  if(!dirty && !saving){ try{ await load(); saveErr = ''; }catch(_){} }
-  render();
+  await flush();
+  showList(); window.scrollTo(0,0);
 };
 // 이미 이 화면에서 사이드바 항목을 다시 누르면 제품 목록으로
 document.addEventListener('click', e=>{ if(e.target.closest('a[href="#/launch"]') && location.hash.replace(/^#\/?/,'')==='launch' && PID) backToList(); });
