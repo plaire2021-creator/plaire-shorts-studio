@@ -609,7 +609,7 @@ function route() {
   $("shortsSide").classList.toggle("hidden", !isShorts);
   $("shortsTop").classList.toggle("hidden", !isShorts);
   $("crumbSection").textContent = sec.title;
-  const sub = isShorts || ["weekly-sales", "review-reply", "monthly-sales", "blog"].includes(name); // 하위 단계 표시가 있는 화면
+  const sub = isShorts || ["weekly-sales", "review-reply", "monthly-sales", "blog", "launch"].includes(name); // 하위 단계 표시가 있는 화면
   $("crumbSep").classList.toggle("hidden", !sub);
   $("crumb").classList.toggle("hidden", !sub);
   if (!isShorts && name !== "home") {

@@ -298,15 +298,38 @@ const blogView = (r) => {
   if (r.status === "running" && !live && !alive(r.server_pid)) return { ...r, status: "failed", error: "스튜디오가 꺼져서 중단됐어요. 다시 넣어 주세요" };
   return { ...r, running: live || (r.status === "running" && alive(r.server_pid)) };
 };
-// ---------- 신제품 출시 매뉴얼 (팀 공용) ----------
-app.get("/api/launch", (req, res) => res.json(launch.load()));
-app.put("/api/launch", (req, res) => {
+// ---------- 신제품 출시 매뉴얼 (제품별, 팀 공용) ----------
+const launchErr = (res, e) => res.status(/찾지 못/.test(e.message) ? 404 : 400).json({ error: e.message });
+app.get("/api/launch/products", (req, res) => res.json({ owners: launch.OWNERS, products: launch.list() }));
+app.post("/api/launch/products", (req, res) => {
   try {
-    const r = launch.save(Number(req.body?.version), req.body?.state);
+    res.json(launch.create(req.body || {}));
+  } catch (e) {
+    launchErr(res, e);
+  }
+});
+app.get("/api/launch/products/:id", (req, res) => {
+  try {
+    res.json(launch.load(req.params.id));
+  } catch (e) {
+    launchErr(res, e);
+  }
+});
+app.put("/api/launch/products/:id", (req, res) => {
+  try {
+    const r = launch.save(req.params.id, Number(req.body?.version), req.body?.state);
     if (r.conflict) return res.status(409).json(r);
     res.json({ version: r.version });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    launchErr(res, e);
+  }
+});
+app.delete("/api/launch/products/:id", (req, res) => {
+  try {
+    launch.remove(req.params.id);
+    res.json({ ok: true });
+  } catch (e) {
+    launchErr(res, e);
   }
 });
 

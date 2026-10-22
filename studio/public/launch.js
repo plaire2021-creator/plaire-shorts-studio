@@ -1,6 +1,6 @@
 (function(){
 // 팀장님 매뉴얼의 화면 코드를 옮기고, 저장만 서버(/api/launch)로 바꿨다 — 팀 모두가 같은 내용을 본다
-let S = null, VER = 0, rev = 0, savedRev = 0, saving = false, saveErr = '', saveTimer = null;
+let S = null, PID = null, VER = 0, rev = 0, savedRev = 0, saving = false, saveErr = '', saveTimer = null;
 let ART = null, readOnly = false, dirty = false, tab = 'dash', calMonth = null, perfCp = 'W1', resetArm = false, delPlat = -1, editPeriod = -1;
 let calHide = {}, calColor = 'st';
 let expSel = 'all', expEdit = '', expMonth = null, expHide = {};
@@ -10,6 +10,11 @@ const PCOL = ['var(--accent)','var(--x0)','var(--warn)','var(--x2)','var(--x3)',
 const pcol = ci => PCOL[ci % PCOL.length];
 const STC = {완료:'var(--ok)',진행중:'var(--info)',대기:'var(--accent)',보류:'var(--warn)',지연:'var(--bad)'};
 const ROOT = document.getElementById('launchView');
+const OWNERS = ['MS팀','김은하','박주혁','방채원']; // 담당은 이 중에서 고른다 (서버 lib/launch.js와 같게)
+function ownerSel(id, attrs, v){
+  const list = v && !OWNERS.includes(v) ? [...OWNERS, v] : OWNERS; // 예전에 손으로 적은 이름도 남겨 둔다
+  return `<select id="${id}" ${attrs} aria-label="담당">${v?'':'<option value="" selected>미정</option>'}${list.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
+}
 const $ = s => ROOT.querySelector(s);
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const won = n => (Math.round(n)||0).toLocaleString('ko-KR');
@@ -66,6 +71,7 @@ function markDirty(){ dirty = true; rev++; renderTop(); queueSave(); }
 function renderTop(){
   if(!S) return;
   $('#lnProd').textContent = S.product.name;
+  setCrumb(S.product.name);
   $('#lnDday').textContent = dlabel(dnum(TODAY));
   $('#lnLaunch').textContent = '출시 '+S.product.launch.replace(/-/g,'.')+' ('+wd(S.product.launch)+')';
   const m = $('#lnSave');
@@ -105,7 +111,7 @@ function vDash(){
   const week = T.filter(t=>t.st!=='완료' && tStart(t)<=addD(TODAY,7) && tEnd(t)>=TODAY);
   const tot = chTotals();
   const lastCp = [...S.checkpoints].reverse().find(c=>hasPerf(c.key));
-  let h = `<div class="example">${esc(S.product.memo)}</div>`;
+  let h = S.product.memo ? `<div class="example">${esc(S.product.memo)}</div>` : '';
   h += `<div class="tiles">
     <div class="tile"><div class="k">전체 업무 진행률</div><div class="v">${pct(done,T.length)}%</div><div class="s">완료 ${done} / ${T.length}건</div></div>
     <div class="tile ${late.length?'alert':''}"><div class="k">마감 지난 업무</div><div class="v">${late.length}건</div><div class="s">완료·보류 제외</div></div>
@@ -140,9 +146,8 @@ function vDash(){
     <label>제품명<input id="pf-name" type="text" value="${esc(S.product.name)}"></label>
     <label>출시일 (상품 등록일, D-day)<input id="pf-launch" type="date" value="${S.product.launch}"></label>
     <label>카테고리<input id="pf-cat" type="text" value="${esc(S.product.category)}"></label>
-    <label>기본 담당<input id="pf-team" type="text" value="${esc(S.product.team)}"></label>
-  </div><p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다.</p>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px"><button class="btn small danger" id="resetBtn">${resetArm?'한 번 더 누르면 초기화됩니다':'새 제품으로 시작 (상태·체크·실적 비우기)'}</button>${resetArm?'<button class="btn small" id="resetCancel">취소</button>':''}</div></div>`;
+    <label>기본 담당 (새로 추가하는 업무에 들어가요)${ownerSel('pf-team', '', S.product.team)}</label>
+  </div><p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다. 제품을 지우려면 「← 제품 목록」에서 지우세요.</p></div>`;
   return h;
 }
 
@@ -180,7 +185,7 @@ function vExp(){
     <div class="expset"><label>시작일<input type="date" id="xs-${xi}-start" data-xset="${xi}" data-f="start" value="${x.start}"></label>
     <label>목표 인원(건)<input type="number" id="xs-${xi}-target" data-xset="${xi}" data-f="target" value="${x.target}" min="0"></label>
     <label>예산(원)<input type="number" id="xs-${xi}-budget" data-xset="${xi}" data-f="budget" value="${x.budget}" min="0" step="10000"></label>
-    <label>담당<input type="text" id="xs-${xi}-owner" data-xset="${xi}" data-f="owner" value="${esc(x.owner||'')}"></label></div>
+    <label>담당${ownerSel(`xs-${xi}-owner`, `data-xset="${xi}" data-f="owner"`, x.owner)}</label></div>
     <div class="tiles" style="margin:0"><div class="tile"><div class="k">프로세스 진행</div><div class="v">${pct(d,x.steps.length)}%</div><div class="s">${d} / ${x.steps.length}단계 완료</div></div>
     <div class="tile"><div class="k">참여자</div><div class="v">${act}명</div><div class="s">목표 ${x.target}명</div></div>
     <div class="tile"><div class="k">게시 완료</div><div class="v">${po}건</div><div class="s">달성률 ${pct(po,x.target)}%</div></div>
@@ -191,7 +196,7 @@ function vExp(){
     h += `<tr class="${st.st==='완료'?'done':(lt?'late':'')}"><td class="stepc"><b>${stepNo(si+1)}</b></td>
       <td style="min-width:240px"><input type="text" id="xp-${key}-name" data-xp="${key}" data-f="name" value="${esc(st.name)}">${lt?`<span class="pill st-지연" style="margin-top:3px">지연 ${Math.round((parse(TODAY)-parse(xEnd(x,st)))/864e5)}일</span>`:''}</td>
       <td>${expEdit===key?`<div class="pedit"><input type="date" id="xp-${key}-ds" data-xpd="${key}" data-f="s" value="${xStart(x,st)}" aria-label="시작일"><input type="date" id="xp-${key}-de" data-xpd="${key}" data-f="e" value="${xEnd(x,st)}" aria-label="마감일"><button class="btn small" id="xpDone">확인</button></div>`:`<button class="period" data-xper="${key}" title="눌러서 날짜 변경">${kdr(xStart(x,st),xEnd(x,st))}</button>`}</td>
-      <td style="min-width:80px"><input type="text" id="xp-${key}-owner" data-xp="${key}" data-f="owner" value="${esc(st.owner||'')}"></td>
+      <td style="min-width:96px">${ownerSel(`xp-${key}-owner`, `data-xp="${key}" data-f="owner"`, st.owner)}</td>
       <td style="min-width:96px"><select id="xp-${key}-st" data-xp="${key}" data-f="st" class="s-${st.st}">${EXPST.map(o=>`<option ${o===st.st?'selected':''}>${o}</option>`).join('')}</select></td>
       <td style="min-width:150px"><input type="text" id="xp-${key}-memo" data-xp="${key}" data-f="memo" value="${esc(st.memo||'')}"></td>
       <td><button class="btn small ghost" data-xpdel="${key}" aria-label="단계 삭제">✕</button></td></tr>`; });
@@ -340,7 +345,7 @@ function vProg(){
       <td class="stepc"><select id="tk-${i}-step" data-tk="${i}" data-f="step" aria-label="단계" style="min-width:200px">${t.step?'':'<option value="0" selected>단계 없음</option>'}${S.steps.map((n,k)=>k===12?'':`<option value="${k+1}" ${t.step===k+1?'selected':''}>${stepNo(k+1)} ${esc(n)}</option>`).join('')}</select></td>
       <td style="min-width:200px"><input type="text" id="tk-${i}-name" data-tk="${i}" data-f="name" value="${esc(bare(t.name))}">${late?`<span class="pill st-지연" style="margin-top:3px">지연 ${dnum(TODAY)-t.e}일</span>`:''}</td>
       <td style="min-width:110px"><select id="tk-${i}-ch" data-tk="${i}" data-f="ch" aria-label="채널(플랫폼)">${S.checklists.map((c,k)=>`<option value="${k}" ${t._ci===k?'selected':''}>${esc(c.name)}</option>`).join('')}</select></td>
-      <td style="min-width:80px"><input type="text" id="tk-${i}-owner" data-tk="${i}" data-f="owner" value="${esc(t.owner||'')}"></td>
+      <td style="min-width:96px">${ownerSel(`tk-${i}-owner`, `data-tk="${i}" data-f="owner"`, t.owner)}</td>
       <td>${editPeriod===i?`<div class="pedit"><input type="date" id="tk-${i}-ds" data-tkd="${i}" data-f="s" value="${tStart(t)}" aria-label="시작일"><input type="date" id="tk-${i}-de" data-tkd="${i}" data-f="e" value="${tEnd(t)}" aria-label="마감일"><button class="btn small" id="periodDone">확인</button></div>`
         :`<button class="period" data-period="${i}" title="눌러서 날짜 변경">${periodTxt(t)}</button>${t.rec==='weekly'?'<div class="note">매주 월요일</div>':''}`}</td>
       <td style="min-width:96px"><select id="tk-${i}-st" data-tk="${i}" data-f="st" class="s-${t.st}">${STS.map(s=>`<option ${s===t.st?'selected':''}>${s}</option>`).join('')}</select></td>
@@ -445,10 +450,12 @@ function vCal(){
 /* ---------- 렌더·이벤트 ---------- */
 const TABS = [['dash','대시보드',vDash],['flow','업무 순서',vFlow],['check','플랫폼별 리스트',vCheck],['exp','체험단',vExp],['goal','판매 목표·비용',vGoal],['perf','성과 분석',vPerf],['prog','진행현황',vProg],['cal','캘린더',vCal]];
 function shell(){
-  ROOT.innerHTML = `<div class="welcome"><h1>신제품 출시 매뉴얼</h1><p>상품을 등록한 날(D-day)부터 채널별 할 일·체험단·판매 목표·성과를 한곳에서 챙겨요. 고친 내용은 자동으로 저장되고 팀 모두에게 똑같이 보여요.</p></div>
-  <section class="card ln-head"><div class="ln-prod"><span class="tag blue" id="lnDday"></span><b id="lnProd"></b><span class="muted" id="lnLaunch"></span><span class="muted">오늘 ${TODAY.replace(/-/g,'.')}</span></div><span class="tag" id="lnSave"></span></section>
+  ROOT.innerHTML = `<div class="welcome"><h1>신제품 출시 매뉴얼</h1><p>제품마다 상품을 등록한 날(D-day)부터 채널별 할 일·체험단·판매 목표·성과를 한곳에서 챙겨요. 고친 내용은 자동으로 저장되고 팀 모두에게 똑같이 보여요.</p></div>
+  <div id="lnList" class="ln-stack"></div>
+  <div id="lnProduct" class="ln-stack hidden">
+  <section class="card ln-head"><div class="ln-prod"><button class="mini" id="lnBack">← 제품 목록</button><span class="tag blue" id="lnDday"></span><b id="lnProd"></b><span class="muted" id="lnLaunch"></span><span class="muted">오늘 ${TODAY.replace(/-/g,'.')}</span></div><span class="tag" id="lnSave"></span></section>
   <div class="seg ln-tabs" role="tablist">${TABS.map(([k,l],i)=>`<button role="tab" data-tab="${k}" class="${k===tab?'on':''}"><span class="n">${i+1}</span>${l}</button>`).join('')}</div>
-  <section id="lnView"></section>`;
+  <section id="lnView"></section></div>`;
 }
 function render(focusId){
   ROOT.querySelectorAll('.ln-tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
@@ -462,7 +469,12 @@ function addItem(ci){ const el=document.getElementById('na-'+ci); const v=(el&&e
 function addPlat(){ const el=$('#newPlat'); const v=(el&&el.value||'').trim(); if(!v) return; S.checklists.push({key:'p'+Date.now(),name:v,items:[]}); markDirty(); render('na-'+(S.checklists.length-1)); }
 document.addEventListener('click', e=>{
   if(!ROOT.contains(e.target)) return;
+  const row = e.target.closest('[data-lnopen]');
+  if(row && !e.target.closest('button')){ openProduct(row.dataset.lnopen); return; }
   const b = e.target.closest('button'); if(!b) return;
+  if(b.id==='lnBack'){ backToList(); return; }
+  if(b.id==='lnAdd'){ addProduct(); return; }
+  if(b.dataset.lndel){ delProduct(b.dataset.lndel, b.dataset.name); return; }
   if(b.dataset.tab){ tab=b.dataset.tab; editPeriod=-1; openCol=null; render(); try{localStorage.setItem('fleur-launch-tab',tab);}catch(_){} return; }
   if(b.dataset.goexp){ tab='exp'; expSel=b.dataset.goexp; render(); return; }
   if(b.dataset.exps){ expSel=b.dataset.exps; expEdit=''; render(); return; }
@@ -567,15 +579,17 @@ document.addEventListener('change', e=>{
 });
 
 /* ---------- 저장 (서버, 자동) ---------- */
+const purl = () => '/api/launch/products/' + encodeURIComponent(PID);
 function queueSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(save, 700); }
 async function save(){
-  if(!dirty) return;
+  if(!dirty || !PID) return;
   if(saving){ queueSave(); return; }
   saving = true; renderTop();
-  const sent = rev;
+  const sent = rev, pid = PID;
   try{
-    const r = await fetch('/api/launch', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({version: VER, state: S})});
+    const r = await fetch('/api/launch/products/' + encodeURIComponent(pid), {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({version: VER, state: S})});
     const j = await r.json().catch(()=>({}));
+    if(pid !== PID){ saving = false; return; }
     if(r.status===409){
       S = j.state; VER = j.version; migrate(); dirty = false; savedRev = rev;
       saveErr = '다른 분이 먼저 고쳐서 최신 내용으로 다시 불러왔어요. 방금 바꾼 칸은 다시 입력해 주세요.';
@@ -587,25 +601,84 @@ async function save(){
   saving = false; renderTop();
   if(dirty && !saveErr) queueSave();
 }
+// 다른 제품·목록으로 가기 전에 남은 변경을 저장한다
+async function flush(){
+  clearTimeout(saveTimer);
+  for(let i=0; i<50 && (dirty||saving) && !saveErr; i++){ if(saving) await new Promise(r=>setTimeout(r,150)); else await save(); }
+}
 async function load(){
-  const r = await fetch('/api/launch');
+  const r = await fetch(purl());
   if(!r.ok) throw new Error('load');
   const j = await r.json();
   S = j.state; VER = j.version; migrate();
 }
+function setCrumb(t){ const c = document.getElementById('crumb'); if(c) c.textContent = t || ''; }
+
+/* ---------- 제품 목록 ---------- */
+const dOf = d => Math.round((parse(TODAY)-parse(d))/864e5);
+async function showList(){
+  PID = null; S = null; setCrumb('');
+  $('#lnProduct').classList.add('hidden');
+  const box = $('#lnList'); box.classList.remove('hidden');
+  let list = [];
+  try{ const r = await fetch('/api/launch/products'); if(!r.ok) throw 0; list = (await r.json()).products; }
+  catch(_){ box.innerHTML = '<div class="err-box">제품 목록을 불러오지 못했어요. 업무 도구 서버가 켜져 있는지 확인하고 새로고침해 주세요.</div>'; return; }
+  const keep = { name: $('#lnNewName')?.value || '', launch: $('#lnNewLaunch')?.value || TODAY, team: $('#lnNewTeam')?.value || OWNERS[0] };
+  box.innerHTML = `<section class="card"><div class="card-head"><h2>새 제품 추가</h2><span class="tag">업무·체험단 틀은 매뉴얼 그대로</span></div>
+    <div class="ln-new">
+      <div class="fg"><label class="fg-label" for="lnNewName">제품명</label><input class="field" id="lnNewName" placeholder="예: 블랑누아 월넛 거실장 2600" value="${esc(keep.name)}"></div>
+      <div class="fg"><label class="fg-label" for="lnNewLaunch">출시일 <small>상품 등록일 = D-day</small></label><input class="field" type="date" id="lnNewLaunch" value="${keep.launch}"></div>
+      <div class="fg"><label class="fg-label" for="lnNewTeam">기본 담당</label><select class="field" id="lnNewTeam">${OWNERS.map(o=>`<option ${o===keep.team?'selected':''}>${o}</option>`).join('')}</select></div>
+    </div>
+    <p class="err" id="lnNewErr"></p>
+    <button class="btn-dark wide" id="lnAdd">제품 추가</button></section>
+  <section class="active-jobs"><div class="active-head">제품 목록 <span class="count-badge">${list.length}</span></div>${list.length ? list.map(p=>{
+      const d = dOf(p.launch), all = p.total && p.done===p.total, c = p.late ? 'red' : all ? 'green' : 'amber';
+      return `<div class="active-row ${c}" data-lnopen="${esc(p.id)}" role="button" tabindex="0"><span class="name">${esc(p.name)}</span><span class="muted ln-meta">출시 ${p.launch.replace(/-/g,'.')} · ${dlabel(d)} · ${esc(p.team||'')}</span><span class="tag ${c}">완료 ${p.done}/${p.total}${p.late?` · 지연 ${p.late}`:''}</span><span class="go">열기</span><button class="del" data-lndel="${esc(p.id)}" data-name="${esc(p.name)}">삭제</button></div>`; }).join('')
+    : '<p class="active-empty">아직 등록한 제품이 없어요. 위에서 제품을 추가하세요.</p>'}</section>`;
+}
+async function openProduct(id){
+  await flush();
+  PID = id; S = null; VER = 0; rev = savedRev = 0; dirty = false; saveErr = '';
+  calMonth = null; expSel = 'all'; expEdit = ''; expMonth = null; expHide = {}; calHide = {}; CF = {}; openCol = null; editPeriod = -1; delPlat = -1; perfCp = 'W1'; resetArm = false;
+  try{ await load(); }catch(_){ alert('이 제품을 불러오지 못했어요. 목록을 다시 볼게요.'); return showList(); }
+  $('#lnList').classList.add('hidden'); $('#lnProduct').classList.remove('hidden');
+  render(); window.scrollTo(0,0);
+}
+async function backToList(){ await flush(); showList(); window.scrollTo(0,0); }
+async function addProduct(){
+  const name = $('#lnNewName').value.trim(), launch = $('#lnNewLaunch').value, team = $('#lnNewTeam').value, err = $('#lnNewErr');
+  if(!name){ err.textContent = '제품명을 입력해 주세요'; return; }
+  if(!launch){ err.textContent = '출시일을 골라 주세요'; return; }
+  const b = $('#lnAdd'); b.disabled = true;
+  try{
+    const r = await fetch('/api/launch/products', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, launch, team})});
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.error || '추가하지 못했어요');
+    $('#lnNewName').value = '';
+    await openProduct(j.id);
+  }catch(e){ err.textContent = e.message; }
+  finally{ b.disabled = false; }
+}
+async function delProduct(id, name){
+  if(!confirm(`'${name}' 제품의 매뉴얼(체크·일정·실적)을 지울까요?`)) return;
+  const r = await fetch('/api/launch/products/' + encodeURIComponent(id), {method:'DELETE'});
+  if(!r.ok) alert('지우지 못했어요. 잠시 후 다시 해 주세요.');
+  showList();
+}
 
 /* ---------- 시작 ---------- */
 try{ const t=localStorage.getItem('fleur-launch-tab'); if(t && TABS.some(x=>x[0]===t)) tab=t; }catch(_){}
-// 사이드바에서 이 화면을 열 때마다 최신 내용을 받아 온다 (고치는 중이면 그대로 둔다)
+// 사이드바에서 이 화면을 열면: 보던 제품이 있으면 최신 내용으로 다시 그리고, 없으면 제품 목록
 window.launchOpen = async function(){
   if(!ROOT.dataset.ready){ shell(); ROOT.dataset.ready = '1'; }
-  if(!dirty && !saving){
-    try{ await load(); saveErr = ''; }
-    catch(_){ if(!S){ $('#lnView').innerHTML = '<div class="err-box">매뉴얼을 불러오지 못했어요. 업무 도구 서버가 켜져 있는지 확인하고 새로고침해 주세요.</div>'; return; } }
-  }
+  if(!PID) return showList();
+  if(!dirty && !saving){ try{ await load(); saveErr = ''; }catch(_){} }
   render();
 };
+// 이미 이 화면에서 사이드바 항목을 다시 누르면 제품 목록으로
+document.addEventListener('click', e=>{ if(e.target.closest('a[href="#/launch"]') && location.hash.replace(/^#\/?/,'')==='launch' && PID) backToList(); });
 // 주소가 처음부터 #/launch면 app.js의 첫 화면 전환이 이 파일보다 먼저 돌아서 여기서 연다
 if(location.hash.replace(/^#\/?/,'')==='launch') window.launchOpen();
-window.addEventListener('beforeunload', ()=>{ if(dirty) fetch('/api/launch', {method:'PUT', keepalive:true, headers:{'Content-Type':'application/json'}, body: JSON.stringify({version: VER, state: S})}); });
+window.addEventListener('beforeunload', ()=>{ if(dirty && PID) fetch(purl(), {method:'PUT', keepalive:true, headers:{'Content-Type':'application/json'}, body: JSON.stringify({version: VER, state: S})}); });
 })();

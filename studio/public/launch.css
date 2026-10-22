@@ -241,3 +241,10 @@
 #launchView .mgr{border-radius:6px;font-weight:600}
 #launchView .bar{height:6px}
 #launchView .err-box{padding:16px;border-radius:12px;background:var(--red-soft);color:var(--red)}
+#launchView .ln-stack{display:grid;gap:20px;align-content:start}
+#launchView .ln-new{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:0 14px}
+#launchView .ln-new .fg{margin-bottom:6px}
+#launchView .ln-meta{white-space:nowrap;font-size:12.5px}
+#launchView .prodform select,#launchView .expset select{border:1px solid var(--line-2);border-radius:7px;padding:6px 8px;background:var(--card);font:inherit;font-size:13px;color:var(--ink)}
+@media (max-width:760px){#launchView .ln-new{grid-template-columns:1fr}#launchView .ln-meta{display:none}}
+#launchView,#launchView .ln-stack{grid-template-columns:minmax(0,1fr)}
