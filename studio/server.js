@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
-import { exec } from "node:child_process";
+import { exec, execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import multer from "multer";
@@ -520,6 +520,33 @@ async function checkUpdate() {
   process.exit(75);
 }
 if (process.env.PLAIRE_WATCHDOG) setInterval(() => checkUpdate().catch((e) => console.error(stamp(), e)), 60 * 1000);
+
+// GitHub에서 새 버전 받아오기: 켜지고 1분 뒤 + 30분마다 (받아만 두면 위 checkUpdate가 하던 일이 끝난 뒤 갈아탄다)
+let fetching = false;
+const run = (exe, args) =>
+  new Promise((ok) => execFile(exe, args, { windowsHide: true, timeout: 5 * 60 * 1000 }, (e, out, err) => ok({ code: e ? e.code ?? 1 : 0, text: `${out || ""}${err || ""}`.trim() })));
+async function fetchUpdate() {
+  if (fetching) return { busy: true };
+  const exe = findClaude();
+  if (!exe) return { error: "Claude Code를 찾지 못했어요" };
+  fetching = true;
+  try {
+    const m = await run(exe, ["plugin", "marketplace", "update", "plaire-tools"]);
+    const p = await run(exe, ["plugin", "update", "plaire-shorts-studio@plaire-tools"]);
+    const got = /updated from\s+(\S+)\s+to\s+(\S+)/.exec(p.text);
+    if (got) console.log(`${stamp()} GitHub에서 새 버전을 받았어요: ${got[1]} → ${got[2]}`);
+    else if (m.code || p.code) console.error(`${stamp()} 새 버전 확인 실패: ${(m.code ? m.text : p.text).split(/\r?\n/).pop()}`);
+    return { ok: true, updated: got ? got[2] : null, current: VERSION };
+  } finally {
+    fetching = false;
+  }
+}
+// 화면이나 다른 곳에서 "지금 확인"할 때
+app.post("/api/update/check", async (req, res) => res.json(await fetchUpdate()));
+if (process.env.PLAIRE_WATCHDOG) {
+  setTimeout(() => fetchUpdate().catch((e) => console.error(stamp(), e)), 60 * 1000);
+  setInterval(() => fetchUpdate().catch((e) => console.error(stamp(), e)), 30 * 60 * 1000);
+}
 
 // localhost가 ::1로 풀리는 PC도 있어서 두 주소 모두에서 받는다
 const onListen = () => {
