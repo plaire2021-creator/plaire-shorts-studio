@@ -482,14 +482,14 @@ function calDays(){
   const days = {}, L = S.product.launch;
   const grp = (d,k,o) => { const m = (days[d] = days[d] || new Map()); if(!m.has(k)) m.set(k, {...o, items:[]}); return m.get(k); };
   TK().forEach(t=>{
-    const it = {name:bare(t.name), ch:t.ch, owner:t.owner, st:t.st, late:isLate(t)};
+    const it = {name:bare(t.name), ch:t.ch, owner:t.owner, st:t.st, late:isLate(t), ref:'t-'+t._ci+'-'+t._ii};
     if(t.rec==='weekly'){ for(let n=Math.max(0,t.s); n<=t.e; n++){ const d = addD(L,n); if(new Date(parse(d)).getUTCDay()===1) grp(d,'w',{order:99, label:'주간 체크', weekly:1}).items.push({...it, late:false}); } return; }
-    grp(tEnd(t), 's'+t.step, {order:t.step||98, label:stepNo(t.step)+' '+stepName(t.step)}).items.push(it);
+    grp(tEnd(t), 's'+t.step, {order:t.step||98, label:stepName(t.step)||'기타'}).items.push(it);
   });
   const xn = EXPN();
-  S.exp.filter(x=>goOf(x)==='진행').forEach(x=>x.steps.forEach(st=>{ // '검토중' 체험단은 달력에 안 넣는다
-    grp(xEnd(x,st), 'x', {order:xn, label:stepNo(xn)+' '+(S.steps[xn-1]||'체험단')}).items.push({name:'['+x.name+'] '+st.name, ch:x.ch, owner:st.owner, st:st.st, late:xLate(x,st)});
-  }));
+  S.exp.forEach((x,xi)=>{ if(goOf(x)!=='진행') return; x.steps.forEach((st,si)=>{ // '검토중' 체험단은 달력에 안 넣는다
+    grp(xEnd(x,st), 'x', {order:xn, label:S.steps[xn-1]||'체험단'}).items.push({name:'['+x.name+'] '+st.name, ch:x.ch, owner:st.owner, st:st.st, late:xLate(x,st), ref:'x-'+xi+'-'+si});
+  }); });
   for(const m of Object.values(days)) for(const g of m.values()){
     const closed = g.items.every(i=>i.st==='완료'||i.st==='보류');
     g.state = closed ? 'done' : g.items.some(i=>i.late) ? 'late' : 'todo';
@@ -516,7 +516,7 @@ function vCal(){
   // 고른 날 자세히
   if(calSel){
     const gs = [...(days[calSel]||new Map()).values()].sort((a,b)=>a.order-b.order);
-    h += `<div class="panel mc-detail"><h3>${kd(calSel)} (${wd(calSel)})${calSel===S.product.launch?' · 출시일':''}</h3>${gs.length ? gs.map(g=>`<div class="mc-g"><div class="mc-gh"><span class="mc-dot ${g.state}"></span><b>${esc(g.label)}</b><span class="note">${g.items.filter(i=>i.st==='완료'||i.st==='보류').length}/${g.items.length}</span></div>${g.items.map(i=>`<div class="mc-it ${i.st==='완료'?'done':''}"><span>${esc(i.name)}</span><span class="note">${esc(i.ch||'')}${i.owner?' · '+esc(i.owner):''}</span><span class="pill st-${i.late&&i.st!=='완료'&&i.st!=='보류'?'지연':i.st}">${i.late&&i.st!=='완료'&&i.st!=='보류'?'지연':i.st}</span></div>`).join('')}</div>`).join('') : '<p class="note">이날 마감인 업무가 없어요.</p>'}</div>`;
+    h += `<div class="panel mc-detail"><h3>${kd(calSel)} (${wd(calSel)})${calSel===S.product.launch?' · 출시일':''}</h3>${gs.length ? gs.map(g=>`<div class="mc-g"><div class="mc-gh"><span class="mc-dot ${g.state}"></span><b>${esc(g.label)}</b><span class="note">${g.items.filter(i=>i.st==='완료'||i.st==='보류').length}/${g.items.length}</span>${g.weekly?'<span class="note mc-wkn">매주 월요일 반복</span>':g.items.length>1?`<label class="mc-move">모두 옮기기<input type="date" class="mc-date" data-gdate="${g.items.map(i=>i.ref).join(',')}" value="${calSel}"></label>`:''}</div>${g.items.map(i=>`<div class="mc-it ${i.st==='완료'?'done':''}"><span>${esc(i.name)}</span><span class="note">${esc(i.ch||'')}${i.owner?' · '+esc(i.owner):''}</span>${g.weekly?'':`<input type="date" class="mc-date" data-tdate="${i.ref}" value="${calSel}" aria-label="${esc(i.name)} 마감일">`}<span class="pill st-${i.late&&i.st!=='완료'&&i.st!=='보류'?'지연':i.st}">${i.late&&i.st!=='완료'&&i.st!=='보류'?'지연':i.st}</span></div>`).join('')}</div>`).join('') : '<p class="note">이날 마감인 업무가 없어요.</p>'}</div>`;
   } else h += `<p class="note mc-hint">날짜를 누르면 그날 마감인 업무가 아래에 자세히 나와요.</p>`;
   return h;
 }
@@ -646,6 +646,14 @@ document.addEventListener('change', e=>{
     it.url = v; if(/^https?:\/\/\S+$/i.test(v)) setDone(it,true); else if(!v && it.st==='완료') it.st='대기';
     markDirty(); render(); return; }
   if(ds.own2){ const [ci,ii]=ds.own2.split('-').map(Number); S.checklists[ci].items[ii].owner=el.value; markDirty(); render(); return; }
+  if(ds.tdate || ds.gdate){ // 달력 날짜 상세에서 마감일 바꾸기 (시작일이 마감보다 늦어지면 같이 당긴다)
+    if(!el.value) return;
+    (ds.tdate ? [ds.tdate] : ds.gdate.split(',')).forEach(ref=>{
+      const [k,a,b2] = ref.split('-'), A = +a, B = +b2;
+      if(k==='t'){ const it = S.checklists[A].items[B]; it.e = dnum(el.value); if(it.s > it.e) it.s = it.e; }
+      else { const x = S.exp[A], st = x.steps[B]; st.e = Math.round((parse(el.value)-parse(x.start))/864e5); if(st.s > st.e) st.s = st.e; }
+    });
+    calSel = el.value; calMonth = el.value.slice(0,7); markDirty(); render(); return; }
   if(ds.xck){ const [xi,si]=ds.xck.split('-').map(Number); S.exp[xi].steps[si].st = el.checked?'완료':'대기'; markDirty(); render(); return; }
   if(ds.ck){ const [c0,i0]=ds.ck.split('-').map(Number); if(bySheet(S.checklists[c0].items[i0], S.checklists[c0].name)){ render(); return; } }
   if(ds.ck){ const [ci,ii]=ds.ck.split('-').map(Number); setDone(S.checklists[ci].items[ii], el.checked); markDirty(); render(); return; }

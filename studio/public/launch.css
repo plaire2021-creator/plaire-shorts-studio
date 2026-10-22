@@ -460,3 +460,7 @@
 #launchView .mc-it{display:flex;align-items:center;gap:10px;padding:4px 0 4px 15px;font-size:13px}
 #launchView .mc-it>span:first-child{flex:1;min-width:0}
 #launchView .mc-it.done>span:first-child{color:var(--faint);text-decoration:line-through}
+/* 날짜 상세: 마감일 바꾸기 */
+#launchView .mc-date{border:1px solid var(--line-2);border-radius:7px;padding:3px 6px;font:inherit;font-size:12px;background:var(--card);color:var(--ink);flex:none}
+#launchView .mc-move{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--sub)}
+#launchView .mc-wkn{margin-left:auto}
