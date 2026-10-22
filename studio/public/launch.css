@@ -408,3 +408,12 @@
 #launchView .ln-btag{margin-right:6px;padding:1px 6px;font-size:11px;vertical-align:1px}
 #launchView .li-brand{border:1px solid transparent;border-radius:6px;padding:3px 6px;font:inherit;font-size:12px;font-weight:600;background:var(--blue-soft);color:var(--blue);cursor:pointer}
 #launchView .li-brand.gz{background:var(--amber-soft);color:var(--amber)}
+/* 콘텐츠 업무: 링크 칸 */
+#launchView .td-linkbox{display:flex;align-items:center;gap:8px;flex:none}
+#launchView .td-link{width:280px;border:1px solid var(--line-2);border-radius:7px;padding:6px 10px;font:inherit;font-size:12.5px;background:var(--card);color:var(--ink)}
+#launchView .td-link:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-soft)}
+#launchView .td-link::placeholder{color:var(--faint)}
+#launchView .td-open{font-size:12px;font-weight:600;color:var(--blue);text-decoration:none;white-space:nowrap}
+@media (max-width:900px){#launchView .td-link{width:160px}}
+#launchView .td-row input.td-link{width:280px;height:auto;accent-color:auto}
+@media (max-width:900px){#launchView .td-row input.td-link{width:160px}}
