@@ -464,3 +464,16 @@
 #launchView .mc-date{border:1px solid var(--line-2);border-radius:7px;padding:3px 6px;font:inherit;font-size:12px;background:var(--card);color:var(--ink);flex:none}
 #launchView .mc-move{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--sub)}
 #launchView .mc-wkn{margin-left:auto}
+/* 일정: 업무별 마감일 목록 */
+#launchView .mc-list h3{margin:0 0 6px}
+#launchView .ml-step{display:flex;align-items:center;gap:10px;padding:12px 0 4px;border-top:1px solid var(--line);margin-top:6px}
+#launchView .ml-step:first-of-type{border-top:0;margin-top:0}
+#launchView .ml-step b{font-size:13.5px}
+#launchView .ml-step .btn{margin-left:auto}
+#launchView .ml-row{display:flex;align-items:center;gap:12px;padding:5px 8px 5px 14px;border-radius:8px;font-size:13px}
+#launchView .ml-row.hl{background:var(--blue-soft)}
+#launchView .ml-name{flex:1;min-width:0}
+#launchView .ml-row.done .ml-name{color:var(--faint);text-decoration:line-through}
+#launchView .ml-ch{width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#launchView .ml-wk{width:128px;text-align:center}
+#launchView .ml-row .pill{width:52px;text-align:center}

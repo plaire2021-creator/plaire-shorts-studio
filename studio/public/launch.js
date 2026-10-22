@@ -513,11 +513,21 @@ function vCal(){
       ${gs.slice(0,3).map(g=>`<span class="mc-ev ${g.state} ${g.weekly?'mc-wkly':''}">${g.weekly?'↻':'<i></i>'}${esc(g.label)}</span>`).join('')}${gs.length>3?`<span class="mc-more">+${gs.length-3}</span>`:''}</button>`;
   }
   h += `</div>`;
-  // 고른 날 자세히
-  if(calSel){
-    const gs = [...(days[calSel]||new Map()).values()].sort((a,b)=>a.order-b.order);
-    h += `<div class="panel mc-detail"><h3>${kd(calSel)} (${wd(calSel)})${calSel===S.product.launch?' · 출시일':''}</h3>${gs.length ? gs.map(g=>`<div class="mc-g"><div class="mc-gh"><span class="mc-dot ${g.state}"></span><b>${esc(g.label)}</b><span class="note">${g.items.filter(i=>i.st==='완료'||i.st==='보류').length}/${g.items.length}</span>${g.weekly?'<span class="note mc-wkn">매주 월요일 반복</span>':g.items.length>1?`<label class="mc-move">모두 옮기기<input type="date" class="mc-date" data-gdate="${g.items.map(i=>i.ref).join(',')}" value="${calSel}"></label>`:''}</div>${g.items.map(i=>`<div class="mc-it ${i.st==='완료'?'done':''}"><span>${esc(i.name)}</span><span class="note">${esc(i.ch||'')}${i.owner?' · '+esc(i.owner):''}</span>${g.weekly?'':`<input type="date" class="mc-date" data-tdate="${i.ref}" value="${calSel}" aria-label="${esc(i.name)} 마감일">`}<span class="pill st-${i.late&&i.st!=='완료'&&i.st!=='보류'?'지연':i.st}">${i.late&&i.st!=='완료'&&i.st!=='보류'?'지연':i.st}</span></div>`).join('')}</div>`).join('') : '<p class="note">이날 마감인 업무가 없어요.</p>'}</div>`;
-  } else h += `<p class="note mc-hint">날짜를 누르면 그날 마감인 업무가 아래에 자세히 나와요.</p>`;
+  // 달력 아래: 모든 업무를 순서대로, 마감일을 바로 정하면 달력에 반영. 달력에서 고른 날 마감인 업무는 강조
+  const xn = EXPN();
+  h += `<div class="panel mc-list"><h3>업무별 마감일</h3>`;
+  S.steps.forEach((nm,i)=>{
+    const n = i+1;
+    if(n===xn){ h += `<div class="ml-step"><b>${esc(nm)}</b><span class="note">체험단마다 일정이 달라서 체험단 탭에서 정해요</span><button class="btn small" data-goexp="all">체험단 탭 →</button></div>`; return; }
+    const ts = stepTasks(n); if(!ts.length) return;
+    h += `<div class="ml-step"><b>${esc(nm)}</b></div>` + ts.map(t=>{
+      const lt = isLate(t), s2 = lt ? '지연' : t.st, hl = calSel && tEnd(t)===calSel;
+      return `<div class="ml-row ${t.st==='완료'?'done':''} ${hl?'hl':''}"><span class="ml-name">${esc(bare(t.name))}</span><span class="note ml-ch">${esc(t.ch)}</span>${t.rec==='weekly'
+        ? `<span class="note ml-wk">매주 월요일</span>`
+        : `<input type="date" class="mc-date" data-tdate="t-${t._ci}-${t._ii}" value="${tEnd(t)}" aria-label="${esc(bare(t.name))} 마감일">`}<span class="pill st-${s2}">${s2}</span></div>`;
+    }).join('');
+  });
+  h += `</div>`;
   return h;
 }
 
