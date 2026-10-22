@@ -661,13 +661,25 @@ const wkGuess = (n) => (/^sales_/i.test(n) ? "naver" : /SELLER_INSIGHTS/i.test(n
 const wkChannels = () => (wkCo === "플레르가구" ? ["naver", "coupang", "ohouse", "cafe24"] : ["naver", "coupang", "ohouse"]);
 const won = (v) => (v == null ? "-" : v.toLocaleString("ko-KR"));
 
+// 최근 기록 칸은 늘 보이게 두고, 회사를 바꿨을 때만 '불러오는 중'으로 바꾼다 (다른 회사 기록이 잠깐 보이지 않게)
+function histLoading(id, key) {
+  const el = $(id);
+  el.classList.remove("hidden");
+  if (el.dataset.key === key) return;
+  el.dataset.key = key;
+  el.innerHTML = `<div class="active-head">최근 기록</div><p class="active-empty">불러오는 중…</p>`;
+}
 async function weeklyOpen() {
   $("crumbSection").textContent = "주간 매출 통계";
   wkTabs();
-  if (!wkSetup) {
-    wkSetup = await api("/api/weekly/check").catch((e) => ({ ok: false, output: e.message, latest: {} }));
-  }
-  wkShowSetup();
+  histLoading("wkHistory", wkCo);
+  // 이 PC 준비 확인은 몇 초 걸려서 기다리지 않는다 (기다리면 최근 기록이 늦게 떴다 사라졌다 함)
+  if (!wkSetup && !weeklyOpen.checking) {
+    weeklyOpen.checking = true;
+    api("/api/weekly/check")
+      .catch((e) => ({ ok: false, output: e.message, latest: {} }))
+      .then((r) => ((wkSetup = r), (weeklyOpen.checking = false), wkShowSetup()));
+  } else if (wkSetup) wkShowSetup();
   const runs = await api(`/api/weekly/runs?company=${encodeURIComponent(wkCo)}`).catch(() => []);
   const live = runs.find((r) => r.running);
   if (live) return wkOpenRun(live.id);
@@ -1067,6 +1079,7 @@ const mChannels = () => (mCo === "플레르가구" ? ["naver", "coupang", "ohous
 
 async function monthlyOpen() {
   for (const b of $("mCoSeg").querySelectorAll("button")) b.classList.toggle("on", b.dataset.co === mCo);
+  histLoading("mHistory", mCo);
   api("/api/monthly/info").then((i) => ($("mLast").textContent = i.latest?.[mCo] ? `마지막 반영: ${i.latest[mCo]}` : "")).catch(() => {});
   const runs = await api(`/api/monthly/runs?company=${encodeURIComponent(mCo)}`).catch(() => []);
   const live = runs.find((r) => r.running);
