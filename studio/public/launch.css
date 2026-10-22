@@ -379,7 +379,7 @@
 #launchView .dm-lg i.hold{background:var(--amber);border-color:var(--amber)}
 @media (max-width:760px){#launchView .ds-sum{grid-template-columns:1fr}}
 /* 제품 정보: 상품 코드 + 구글 시트 확인 */
-#launchView .li-form{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,.9fr) minmax(0,1fr)}
+#launchView .li-form{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,1fr)}
 #launchView .li-form label small{color:var(--faint);font-weight:400;margin-left:4px}
 #launchView .li-sheet{margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--bg);border:1px solid var(--line)}
 #launchView .li-sheet p{margin:0 0 6px}
@@ -417,3 +417,5 @@
 @media (max-width:900px){#launchView .td-link{width:160px}}
 #launchView .td-row input.td-link{width:280px;height:auto;accent-color:auto}
 @media (max-width:900px){#launchView .td-row input.td-link{width:160px}}
+#launchView .prodform input.need{border-color:var(--amber);background:var(--amber-soft)}
+#launchView .li-need.on{color:var(--amber);font-weight:600}

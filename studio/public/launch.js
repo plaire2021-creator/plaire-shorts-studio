@@ -83,13 +83,13 @@ function renderTop(){
   m.className = 'tag ' + (saveErr ? 'red' : (saving||dirty) ? 'amber' : 'green');
 }
 function renderInfo(){
-  $('#lnInfo').innerHTML = `<div class="li-head"><button class="mini" id="lnBack">← 제품 목록</button><h3>제품 정보</h3><select id="pf-brand" class="li-brand ${prodBrand()==='가즈다가구'?'gz':''}" aria-label="브랜드">${prodBrand()?'':'<option value="" selected>브랜드 고르기</option>'}${BRANDS.map(b=>`<option ${b===prodBrand()?'selected':''}>${b}</option>`).join('')}</select><span class="tag blue">${dlabel(dnum(TODAY))}</span>${S.product.memo?`<span class="tag amber" title="${esc(S.product.memo)}">예시</span>`:''}<span class="tag" id="lnSave"></span></div>
+  $('#lnInfo').innerHTML = `<div class="li-head"><h3>제품 정보</h3><select id="pf-brand" class="li-brand ${prodBrand()==='가즈다가구'?'gz':''}" aria-label="브랜드">${prodBrand()?'':'<option value="" selected>브랜드 고르기</option>'}${BRANDS.map(b=>`<option ${b===prodBrand()?'selected':''}>${b}</option>`).join('')}</select>${S.product.memo?`<span class="tag amber" title="${esc(S.product.memo)}">예시</span>`:''}<span class="tag" id="lnSave"></span></div>
   <div class="prodform li-form">
-    <label>상품 코드 (옵션코드)<input id="pf-code" type="text" value="${esc(S.product.code||'')}" placeholder="예: 블랑누아거실장2600"></label>
     <label>제품명<input id="pf-name" type="text" value="${esc(S.product.name)}"></label>
+    <label>상품 코드 (옵션코드)<input id="pf-code" type="text" class="${S.product.code?'':'need'}" value="${esc(S.product.code||'')}" placeholder="예: 블랑누아거실장2600"></label>
     <label>출시일 (상품 등록일, D-day)<input id="pf-launch" type="date" value="${S.product.launch}"></label>
     <label>카테고리<input id="pf-cat" type="text" value="${esc(S.product.category)}"></label>
-  </div><p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다. 제품을 지우려면 「← 제품 목록」에서 지우세요.</p>`;
+  </div><p class="note li-need ${S.product.code?'':'on'}">상품 코드(구글 시트 「상품등록 현황」의 옵션코드)를 꼭 넣어 주세요. 넣어야 시트를 보고 상품등록이 자동으로 체크돼요.</p>`;
 }
 // 상품 코드로 구글 시트(플레르가구·가즈다가구 상품등록 현황)에서 찾은 결과를 화면에 띄우지 않고 제품에만 저장해 둔다
 // (S.product.sheet.matches[].channels = 네이버·쿠팡·오늘의집 등록 여부 → 나중에 플랫폼별 상품등록 완료 확인에 쓸 것). sheetBox()는 지금 안 씀
