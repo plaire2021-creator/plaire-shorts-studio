@@ -328,14 +328,24 @@ document.addEventListener("click", (e) => {
   else if (e.target.closest("#drop")) $("photoDir").click();
 });
 
+// 넣은 이미지 미리보기 + 비우기 (zip이면 파일 이름만)
+function showThumbs(box, items, onClear, zip) {
+  for (const u of box.querySelectorAll("img")) URL.revokeObjectURL(u.src);
+  const imgs = items.filter((i) => isImg(i.file));
+  const any = !!zip || imgs.length > 0;
+  box.innerHTML =
+    (zip ? `<span class="zip-chip">${esc(zip.name)}</span>` : imgs.map((i) => `<img src="${URL.createObjectURL(i.file)}" alt="" title="${esc(i.path)}" loading="lazy" decoding="async">`).join("")) +
+    (any ? `<button type="button" class="mini">비우기</button>` : "");
+  box.classList.toggle("hidden", !any);
+  box.onclick = (e) => e.target.closest("button") && onClear();
+}
+
 // 상세페이지 이미지 (여러 장, 파일 이름 순)
 let details = [];
 const detailDrop = $("detailDrop");
 function setDetails(items) {
   details = items.filter((i) => isImg(i.file)).sort(byName);
-  for (const u of $("detailThumbs").querySelectorAll("img")) URL.revokeObjectURL(u.src);
-  $("detailThumbs").innerHTML = details.map((i) => `<img src="${URL.createObjectURL(i.file)}" alt="" title="${esc(i.path)}">`).join("") + (details.length ? `<button class="mini" id="detailClear">비우기</button>` : "");
-  $("detailThumbs").classList.toggle("hidden", !details.length);
+  showThumbs($("detailThumbs"), details, () => setDetails([]));
   $("detailText").textContent = details.length ? `${details.length}장 선택됨 · 더 넣으려면 다시 놓으세요` : "상세페이지 이미지나 폴더를 여기에 놓으세요";
   detailDrop.classList.toggle("picked", !!details.length);
   $("detail").value = "";
@@ -347,7 +357,6 @@ dropZone(detailDrop, (items) => {
 });
 $("detail").onchange = () => setDetails([...details, ...pickedFiles($("detail"))]);
 $("detailDir").onchange = () => setDetails([...details, ...pickedFiles($("detailDir"))]);
-$("detailThumbs").onclick = (e) => e.target.id === "detailClear" && setDetails([]);
 
 // 제품 이미지: 사진 폴더 그대로 또는 zip 하나
 let product = null; // { zip: File } 또는 { files: [{file, path}], name }
@@ -359,6 +368,7 @@ function setProduct(p) {
   else if (p.zip) $("dropText").textContent = `${p.zip.name} (${mb(p.zip.size)})`;
   else $("dropText").textContent = `${p.name ? p.name + " 폴더 · " : ""}사진 ${p.files.filter((i) => isImg(i.file)).length}장 (${mb(p.files.reduce((s, i) => s + i.file.size, 0))})`;
   drop.classList.toggle("picked", !!p);
+  showThumbs($("photoThumbs"), p?.files ? [...p.files].sort(byName) : [], () => setProduct(null), p?.zip);
   if (p && !$("productName").value) $("productName").value = p.zip ? p.zip.name.replace(/\.zip$/i, "") : p.name || "";
   $("zip").value = "";
   $("photoDir").value = "";
@@ -1349,7 +1359,8 @@ function blShowInput() {
 }
 function blSetDetails(items) {
   blDetails = items.filter((i) => isImg(i.file)).sort(byName);
-  $("blDetailText").textContent = blDetails.length ? `${blDetails.length}장 선택됨 · 다시 놓으면 더해져요` : "상세페이지 이미지나 폴더를 여기에 놓으세요";
+  $("blDetailText").textContent = blDetails.length ? `${blDetails.length}장 선택됨 · 더 넣으려면 다시 놓으세요` : "상세페이지 이미지나 폴더를 여기에 놓으세요";
+  showThumbs($("blDetailThumbs"), blDetails, () => blSetDetails([]));
   $("blDetailDrop").classList.toggle("picked", !!blDetails.length);
   $("blDetail").value = "";
   $("blDetailDir").value = "";
@@ -1359,6 +1370,7 @@ function blSetProduct(p) {
   const mb = (n) => `${(n / 1e6).toFixed(0)}MB`;
   $("blPhotoText").textContent = !p ? "제품 사진 폴더를 여기에 놓으세요" : p.zip ? `${p.zip.name} (${mb(p.zip.size)})` : `${p.name ? p.name + " 폴더 · " : ""}사진 ${p.files.filter((i) => isImg(i.file)).length}장`;
   $("blPhotoDrop").classList.toggle("picked", !!p);
+  showThumbs($("blPhotoThumbs"), p?.files ? [...p.files].sort(byName) : [], () => blSetProduct(null), p?.zip);
   if (p && !$("blName").value) $("blName").value = p.zip ? p.zip.name.replace(/\.zip$/i, "") : p.name || "";
   $("blZip").value = "";
   $("blPhotoDir").value = "";
