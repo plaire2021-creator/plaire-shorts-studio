@@ -529,3 +529,6 @@
 #launchView .reg.ing{background:var(--blue-soft);border-color:#c9d6fb;color:var(--blue)}
 #launchView .reg em{font-style:normal;font-weight:500;font-size:12px;opacity:.85}
 #launchView .ds-ch.ing{background:var(--blue-soft);color:var(--blue)}
+/* 체험단 미진행 = 빨강 */
+#launchView .reg.no{background:var(--red-soft);border-color:#f6caca;color:var(--red)}
+#launchView .ds-ch.no{background:var(--red-soft);color:var(--red)}

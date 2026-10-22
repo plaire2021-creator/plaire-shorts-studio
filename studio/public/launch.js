@@ -209,11 +209,11 @@ function vDash(){
       const all = S.exp.filter(xOn).flatMap(x=>x.steps.map(a=>({x,a}))), r = expRange();
       d = all.filter(o=>o.a.st==='완료').length; tot = all.length; rng = r ? md(r.a)+' ~ '+md(r.b) : '진행하는 체험단 없음';
       chans = S.exp.map(x=>{ const go=goOf(x), done = go==='진행' && x.steps.length && x.steps.every(a=>a.st==='완료'||a.st==='보류');
-        return `<span class="ds-ch ${done?'on':go==='진행'?'ing':''}">${esc(x.name)} <em>${done?'완료':go}</em></span>`; }).join('');
+        return `<span class="ds-ch ${done?'on':go==='진행'?'ing':go==='미진행'?'no':''}">${esc(x.name)} <em>${done?'완료':go}</em></span>`; }).join('');
       owners = [...new Set(all.map(o=>o.a.owner).filter(Boolean))];
       // 체험단은 이름만 가로로: 미진행(검토중) 회색 · 진행 파랑 · 진행 상황을 다 끝내면 완료 초록
       if(open) body = `<div class="reg-list">${S.exp.map(x=>{ const go=goOf(x), done = go==='진행' && x.steps.length && x.steps.every(a=>a.st==='완료'||a.st==='보류');
-          const [c,l] = done ? ['on','완료'] : go==='진행' ? ['ing','진행'] : ['', go];
+          const [c,l] = done ? ['on','완료'] : go==='진행' ? ['ing','진행'] : go==='미진행' ? ['no','미진행'] : ['', go];
           return `<span class="reg ${c}">${esc(x.name)} <em>${l}</em></span>`; }).join('')}</div>`
         + `<p class="reg-note">체험단 탭에서 진행 여부와 진행 상황을 관리해요. 진행 상황을 모두 체크하면 자동으로 완료돼요. <button class="linkbtn" data-goexp="all">체험단 탭으로 가기</button></p>`;
     } else {
