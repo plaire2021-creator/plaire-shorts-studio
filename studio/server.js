@@ -337,7 +337,7 @@ app.post("/api/blog/runs", upload.fields([{ name: "zip", maxCount: 1 }, { name: 
       ({ product_dir } = unzipInto(id, zip, dest));
     } else ({ product_dir } = savePhotoFolder(id, photos, JSON.parse(req.body.photo_paths || "[]"), dest));
     if (details.length) saveDetailImages(product_dir, details.map((f) => f.path));
-    res.json(blog.startRun({ id, brand: String(req.body.brand || ""), product_name: name, product_dir }));
+    res.json(blog.startRun({ id, brand: String(req.body.brand || ""), product_name: name, product_dir, topic: String(req.body.topic || "").trim().slice(0, 300) }));
   } catch (e) {
     err(res, e);
   } finally {

@@ -437,3 +437,5 @@ body.remote .local-only{display:none!important}
 .bl-imgs figcaption{font-size:12px;color:var(--faint);margin-top:4px}
 #blResult .card-head{gap:10px}
 #blResult .card-head h2{flex:1}
+.bl-topic{resize:vertical;min-height:52px;font:inherit;line-height:1.5}
+.bl-topic-help{margin:0}

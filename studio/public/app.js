@@ -1316,8 +1316,14 @@ let blProduct = null; // { zip } | { files, name }
 let blRunNow = null;
 let blPoll = null;
 
+const BL_TARGET = { 플레르가구: "가정집(신혼·이사·아이 있는 집 등)", 가즈다가구: "업소(카페·식당·사무실·학원 등)" };
+function blTopicHelp() {
+  $("blTopic").placeholder = blBrand === "가즈다가구" ? "예: 카페 창업 인테리어, 학원 교실 리뉴얼, 식당 좌석 배치" : "예: 신혼집 거실 꾸미기, 강남 ○○ 아파트 입주, 아이 방 정리";
+  $("blTopicHelp").textContent = `아무것도 적지 않으면 지금 가장 인기 있는 키워드를 찾아서 써 드려요. ${blBrand}는 ${BL_TARGET[blBrand]} 고객에게 맞춰 써요.`;
+}
 async function blogOpen() {
   for (const b of $("blSeg").querySelectorAll("button")) b.classList.toggle("on", b.dataset.br === blBrand);
+  blTopicHelp();
   const runs = await api("/api/blog/runs").catch(() => []);
   const live = runs.find((r) => r.running);
   if (live) return blOpenRun(live.id);
@@ -1332,6 +1338,7 @@ $("blSeg").onclick = (e) => {
     localStorage.setItem("blBrand", blBrand);
   } catch {}
   for (const x of $("blSeg").querySelectorAll("button")) x.classList.toggle("on", x.dataset.br === blBrand);
+  blTopicHelp();
 };
 function blShowInput() {
   clearInterval(blPoll);
@@ -1380,6 +1387,7 @@ $("blRun").onclick = async () => {
   const fd = new FormData();
   fd.append("brand", blBrand);
   fd.append("product_name", name);
+  fd.append("topic", $("blTopic").value.trim());
   for (const d of blDetails) fd.append("detail", d.file);
   if (blProduct.zip) fd.append("zip", blProduct.zip);
   else {
@@ -1391,6 +1399,7 @@ $("blRun").onclick = async () => {
   try {
     const r = await api("/api/blog/runs", { method: "POST", body: fd });
     $("blName").value = "";
+    $("blTopic").value = "";
     blSetDetails([]);
     blSetProduct(null);
     $("blErr").textContent = "";

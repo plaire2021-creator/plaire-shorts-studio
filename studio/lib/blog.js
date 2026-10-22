@@ -48,7 +48,12 @@ const describe = (u) => {
   return u.name;
 };
 
-export function startRun({ id, brand, product_name, product_dir }) {
+// 브랜드별 고객 (글의 독자·상황을 여기에 맞춘다)
+const TARGET = {
+  플레르가구: "가정집 — 신혼부부·이사·입주 준비·아이 있는 집·홈카페/홈시네마 등 집에서 쓰는 사람",
+  가즈다가구: "업소 — 카페·식당·사무실·학원·병원 대기실·매장 등을 운영하거나 꾸미는 사장님·담당자",
+};
+export function startRun({ id, brand, product_name, product_dir, topic = "" }) {
   if (!BRANDS.includes(brand)) throw new Error("브랜드를 골라 주세요");
   const exe = findClaude();
   if (!exe) throw new Error("Claude Code를 찾지 못했어요");
@@ -61,6 +66,8 @@ export function startRun({ id, brand, product_name, product_dir }) {
     `${path.join(SKILL, "SKILL.md")} 를 읽고 그 스킬을 스튜디오 모드로 실행해.`,
     `플러그인 루트: ${PLUGIN_ROOT}`,
     `브랜드: ${brand}`,
+    `타깃 고객: ${TARGET[brand]}`,
+    topic ? `원하는 주제(담당자 요청 — 이 주제를 중심으로 쓰고, 그 안에서 검색 수요 큰 키워드를 고른다): ${topic}` : "원하는 주제: 없음 — 타깃 고객이 지금 많이 찾는 주제·키워드를 직접 조사해서 고른다",
     `제품명: ${product_name}`,
     `제품 폴더(제품 사진 + 상세페이지_등록): ${product_dir}`,
     `작업 폴더: ${work}`,
@@ -69,7 +76,7 @@ export function startRun({ id, brand, product_name, product_dir }) {
     "질문하지 말고 끝까지 진행해. 명령은 Bash 도구로 실행해.",
     "진행 상황 메모와 명령 설명은 담당자가 화면에서 읽으니 한국어로 짧게 써.",
   ].join("\n");
-  const run = saveRun({ id, brand, product_name, status: "running", server_pid: process.pid, started_at: new Date().toISOString(), log: ["자료를 받았어요. 주제·키워드를 찾아볼게요"] });
+  const run = saveRun({ id, brand, product_name, topic, status: "running", server_pid: process.pid, started_at: new Date().toISOString(), log: ["자료를 받았어요. 주제·키워드를 찾아볼게요"] });
   const args = ["-p", prompt, "--output-format", "stream-json", "--verbose", "--allowedTools", "Bash Read Write Edit Glob Grep WebSearch WebFetch", "--add-dir", PLUGIN_ROOT];
   const child = spawn(exe, args, { cwd: work, env: { ...process.env, PYTHONUTF8: "1" }, stdio: ["ignore", "pipe", "pipe"] });
   running.set(id, child);
