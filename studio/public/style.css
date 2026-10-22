@@ -416,3 +416,24 @@ body.remote .local-only{display:none!important}
 @keyframes pulse{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){.activity::before{animation:none}}
 .team-box.plain{margin:0;border:0;padding:0;background:none}
+
+/* ---------- 블로그 작성 도우미 ---------- */
+.bl-result{display:grid;gap:14px}
+.bl-now{margin:10px 0 0;font-size:13px;color:var(--sub);background:var(--bg);border-radius:10px;padding:10px 12px;min-height:20px}
+.bl-angle{margin:0;font-size:15px;font-weight:600;line-height:1.6}
+.bl-kw{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.kw{font-size:12.5px;padding:4px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--sub)}
+.kw.main{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+.kw.prod{background:var(--blue-soft);border-color:transparent;color:var(--blue);font-weight:700}
+.bl-titles{display:grid;gap:6px}
+.bl-title{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px}
+.bl-title span{flex:1}
+.bl-title.first{border-color:var(--blue);font-weight:700}
+.bl-body{margin:10px 0 0;padding:18px 20px;background:var(--bg);border-radius:12px;font:inherit;font-size:14px;line-height:1.85;white-space:pre-wrap;word-break:keep-all;max-height:640px;overflow:auto}
+.bl-tags{margin:0;font-size:14px;color:var(--sub);line-height:1.7}
+.bl-imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.bl-imgs figure{margin:0}
+.bl-imgs img{width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block}
+.bl-imgs figcaption{font-size:12px;color:var(--faint);margin-top:4px}
+#blResult .card-head{gap:10px}
+#blResult .card-head h2{flex:1}

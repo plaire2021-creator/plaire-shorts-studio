@@ -18,6 +18,7 @@ import * as reviews from "./lib/reviews.js";
 import * as monthly from "./lib/monthly.js";
 import * as team from "./lib/team.js";
 import * as backup from "./lib/backup.js";
+import * as blog from "./lib/blog.js";
 
 const PORT = Number(process.env.PORT || loadConfig().port || 4173);
 tiktok.setPort(PORT);
@@ -246,8 +247,7 @@ app.post("/api/jobs/copy", upload.fields([{ name: "video", maxCount: 1 }, { name
 });
 
 // 폴더째 올린 사진을 원래 폴더 구조대로 <작업>\product 에 저장 (zip 풀 때와 같은 규칙)
-function savePhotoFolder(id, photos, paths) {
-  const dest = path.join(jobDir(id), "product");
+function savePhotoFolder(id, photos, paths, dest = path.join(jobDir(id), "product")) {
   photos.forEach((f, i) => {
     const rel = String(paths[i] || f.originalname).replace(/\\/g, "/");
     const target = path.normalize(path.join(dest, rel));
@@ -282,6 +282,62 @@ app.post("/api/jobs", upload.fields([{ name: "zip", maxCount: 1 }, { name: "deta
     saveJob({ id, product_name: name, product_dir, status: "queued", log: [], uploads: {}, naver: { clip: false, shopping: false } });
     startGeneration(id);
     res.json(view(loadJob(id)));
+  } catch (e) {
+    err(res, e);
+  } finally {
+    for (const f of [...details, ...photos]) fs.rmSync(f.path, { force: true });
+  }
+});
+
+// ---------- 블로그 작성 도우미 ----------
+// 스튜디오가 꺼졌다 켜져서 멈춘 실행은 '멈춤'으로
+const blogView = (r) => {
+  if (!r) return null;
+  const live = blog.isRunning(r.id);
+  if (r.status === "running" && !live && !alive(r.server_pid)) return { ...r, status: "failed", error: "스튜디오가 꺼져서 중단됐어요. 다시 넣어 주세요" };
+  return { ...r, running: live || (r.status === "running" && alive(r.server_pid)) };
+};
+app.get("/api/blog/runs", (req, res) => res.json(blog.listRuns().map(blogView)));
+app.get("/api/blog/runs/:id", (req, res) => {
+  const r = blogView(blog.loadRun(req.params.id));
+  if (!r) return err(res, new Error("기록이 없어요"), 404);
+  res.json(r);
+});
+app.get("/api/blog/runs/:id/zip", (req, res) => {
+  const z = blog.loadRun(req.params.id)?.result?.zip;
+  if (!z || !fs.existsSync(z)) return err(res, new Error("사진 zip이 없어요"), 404);
+  const r = blog.loadRun(req.params.id);
+  res.download(z, `블로그사진_${String(r.product_name || "제품").replace(/[\\/:*?"<>|]/g, "")}.zip`);
+});
+app.get("/api/blog/runs/:id/img/:name", (req, res) => {
+  const p = blog.imagePath(req.params.id, req.params.name);
+  if (!p) return err(res, new Error("사진이 없어요"), 404);
+  res.sendFile(p);
+});
+app.delete("/api/blog/runs/:id", (req, res) => {
+  blog.stopRun(req.params.id);
+  fs.rmSync(blog.runDir(req.params.id), { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+  res.json({ ok: true });
+});
+app.post("/api/blog/runs", upload.fields([{ name: "zip", maxCount: 1 }, { name: "detail", maxCount: 300 }, { name: "photos", maxCount: 3000 }]), (req, res) => {
+  const zipFile = req.files?.zip?.[0];
+  const details = req.files?.detail || [];
+  const photos = req.files?.photos || [];
+  try {
+    const name = String(req.body.product_name || "").trim();
+    if (!name) throw new Error("제품명을 입력해 주세요");
+    if (!zipFile && !photos.length) throw new Error("제품 사진 폴더나 zip 파일을 넣어 주세요");
+    const id = newJobId();
+    const dest = path.join(blog.runDir(id), "product");
+    fs.mkdirSync(dest, { recursive: true });
+    let product_dir;
+    if (zipFile) {
+      const zip = path.join(blog.runDir(id), "upload.zip");
+      fs.renameSync(zipFile.path, zip);
+      ({ product_dir } = unzipInto(id, zip, dest));
+    } else ({ product_dir } = savePhotoFolder(id, photos, JSON.parse(req.body.photo_paths || "[]"), dest));
+    if (details.length) saveDetailImages(product_dir, details.map((f) => f.path));
+    res.json(blog.startRun({ id, brand: String(req.body.brand || ""), product_name: name, product_dir }));
   } catch (e) {
     err(res, e);
   } finally {
@@ -527,6 +583,7 @@ app.get("/api/activity", (req, res) => {
   for (const r of weekly.listRuns()) if (r.running) items.push({ kind: "주간 매출", label: r.company, what: "집계 중" });
   for (const r of monthly.listRuns()) if (r.running) items.push({ kind: "월간 매출", label: r.company, what: "집계 중" });
   for (const r of reviews.listRuns()) if (r.running) items.push({ kind: "리뷰 답글", label: r.brand, what: "쓰는 중" });
+  for (const r of blog.listRuns()) if (r.running) items.push({ kind: "블로그", label: r.product_name, what: "쓰는 중" });
   res.json({ items });
 });
 
@@ -549,6 +606,7 @@ const busyNow = () =>
   weekly.anyRunning() ||
   monthly.isBusy() ||
   reviews.anyRunning() ||
+  blog.anyRunning() ||
   listJobs().some((j) => Object.values(j.uploads || {}).some((u) => u.state === "uploading"));
 app.get("/api/health", (req, res) => res.json({ ok: true, version: VERSION, busy: busyNow(), pid: process.pid }));
 

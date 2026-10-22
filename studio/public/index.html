@@ -74,7 +74,7 @@
       <div class="tools">
         <a class="tool" href="#/shorts"><span class="tool-ico ico-play"></span><b>숏츠 제작 및 업로드</b><small>제품 사진으로 숏츠를 만들고 유튜브·인스타·틱톡에 올려요</small><span class="tag green">사용 중</span></a>
         <a class="tool" href="#/upload"><span class="tool-ico ico-up"></span><b>제작된 숏츠 업로드</b><small>이미 만든 영상에 제목·설명글을 써서 채널에 올려요</small><span class="tag green">사용 중</span></a>
-        <a class="tool" href="#/blog"><span class="tool-ico ico-pen"></span><b>블로그 작성 도우미</b><small>제품 자료로 블로그 글과 이미지를 준비해요</small><span class="tag">준비 중</span></a>
+        <a class="tool" href="#/blog"><span class="tool-ico ico-pen"></span><b>블로그 작성 도우미</b><small>많이 찾는 주제로 제품을 녹인 네이버 블로그 글과 3:2 사진을 준비해요</small><span class="tag green">사용 중</span></a>
       </div>
       </section>
 
@@ -106,6 +106,84 @@
         <b>준비 중이에요</b>
         <p class="muted">이 항목은 곧 채워질 예정이에요.</p>
       </section>
+    </div>
+
+    <!-- 블로그 작성 도우미 -->
+    <div class="content hidden" id="blogView">
+      <div class="welcome">
+        <h1>블로그 작성 도우미</h1>
+        <p>제품 자료를 넣으면 사람들이 많이 찾는 주제를 찾아 제품을 자연스럽게 녹인 네이버 블로그 글과 3:2 사진을 준비해요.</p>
+      </div>
+      <div class="seg" id="blSeg" role="tablist">
+        <button role="tab" data-br="플레르가구" class="on">플레르가구</button>
+        <button role="tab" data-br="가즈다가구">가즈다가구</button>
+      </div>
+
+      <section class="card" id="blInput">
+        <div class="card-head"><h2>제품 자료 넣기</h2></div>
+        <div class="fg">
+          <label class="fg-label" for="blName">제품명</label>
+          <input class="field" id="blName" placeholder="예: 블랑누아 월넛 거실장">
+        </div>
+        <div class="fg">
+          <span class="fg-label">상세페이지 이미지 <small>이미지 여러 장 또는 폴더째 · 파일 이름 순서대로</small></span>
+          <div class="drop compact" id="blDetailDrop" role="button" tabindex="0">
+            <input type="file" id="blDetail" accept="image/*" multiple hidden>
+            <input type="file" id="blDetailDir" webkitdirectory hidden>
+            <span class="drop-ico" aria-hidden="true"></span>
+            <strong id="blDetailText">상세페이지 이미지나 폴더를 여기에 놓으세요</strong>
+            <span class="pick-row"><button type="button" class="pick" data-pick="blDetail">파일 고르기</button> · <button type="button" class="pick" data-pick="blDetailDir">폴더 고르기</button></span>
+          </div>
+        </div>
+        <div class="fg">
+          <span class="fg-label">제품 이미지 <small>사진 폴더를 그대로 놓거나 zip 파일</small></span>
+          <div class="drop compact" id="blPhotoDrop" role="button" tabindex="0">
+            <input type="file" id="blPhotoDir" webkitdirectory hidden>
+            <input type="file" id="blZip" accept=".zip" hidden>
+            <span class="drop-ico" aria-hidden="true"></span>
+            <strong id="blPhotoText">제품 사진 폴더를 여기에 놓으세요</strong>
+            <span class="pick-row"><button type="button" class="pick" data-pick="blPhotoDir">폴더 고르기</button> · <button type="button" class="pick" data-pick="blZip">zip 고르기</button></span>
+          </div>
+        </div>
+        <p class="err" id="blErr"></p>
+        <button class="btn-dark wide" id="blRun">블로그 글 쓰기</button>
+      </section>
+
+      <section class="card hidden" id="blProgress">
+        <div class="card-head"><h2>블로그 글을 쓰고 있어요</h2><span class="tag amber" id="blElapsed">0:00</span></div>
+        <p class="muted">요즘 많이 찾는 주제를 찾아보고, 글을 쓰고, 사진을 3:2로 다듬어요. 보통 5~10분 걸려요. 이 창을 닫아도 계속 써요.</p>
+        <p class="bl-now" id="blNow"></p>
+      </section>
+
+      <div class="bl-result hidden" id="blResult">
+        <div class="wk-stop hidden" id="blStop"></div>
+        <section class="card" id="blTopicCard">
+          <div class="card-head"><h2>주제 · 키워드</h2></div>
+          <p class="bl-angle" id="blAngle"></p>
+          <p class="muted" id="blWhy"></p>
+          <div class="bl-kw" id="blKw"></div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>제목</h2></div>
+          <div class="bl-titles" id="blTitles"></div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>본문</h2><span class="muted" id="blChars"></span><button class="btn-dark" data-blcopy="blBody">본문 복사</button></div>
+          <p class="muted">네이버 블로그 글쓰기에 그대로 붙여넣고, <b>[사진 N]</b> 자리에 같은 번호 사진을 넣으면 돼요.</p>
+          <pre class="bl-body" id="blBody"></pre>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>태그</h2><button class="btn" data-blcopy="blTags">태그 복사</button></div>
+          <p class="bl-tags" id="blTags"></p>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>사진 <small class="muted" id="blImgCount"></small></h2><a class="btn-dark" id="blZipBtn">사진 zip 받기</a></div>
+          <div class="bl-imgs" id="blImgs"></div>
+        </section>
+        <ul class="rv-notes" id="blNotes"></ul>
+      </div>
+
+      <section class="active-jobs hidden" id="blHistory"></section>
     </div>
 
     <!-- 설정 (업무 도구 전체) -->

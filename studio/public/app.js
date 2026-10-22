@@ -578,17 +578,19 @@ function route() {
   $("reviewView").classList.toggle("hidden", name !== "review-reply");
   $("monthlyView").classList.toggle("hidden", name !== "monthly-sales");
   $("settingsView").classList.toggle("hidden", name !== "settings");
+  $("blogView").classList.toggle("hidden", name !== "blog");
+  if (name === "blog") blogOpen();
   $("settingsBtn").classList.toggle("hidden", !["home", "settings", "shorts", "upload"].includes(name));
   $("settingsBtn").classList.toggle("on", name === "settings");
   if (name === "settings") loadTeam();
-  $("placeholderView").classList.toggle("hidden", isShorts || ["home", "weekly-sales", "review-reply", "monthly-sales", "settings"].includes(name));
+  $("placeholderView").classList.toggle("hidden", isShorts || ["home", "weekly-sales", "review-reply", "monthly-sales", "settings", "blog"].includes(name));
   if (name === "monthly-sales") monthlyOpen();
   if (name === "review-reply") reviewOpen();
   if (name === "weekly-sales") weeklyOpen();
   $("shortsSide").classList.toggle("hidden", !isShorts);
   $("shortsTop").classList.toggle("hidden", !isShorts);
   $("crumbSection").textContent = sec.title;
-  const sub = isShorts || ["weekly-sales", "review-reply", "monthly-sales"].includes(name); // 하위 단계 표시가 있는 화면
+  const sub = isShorts || ["weekly-sales", "review-reply", "monthly-sales", "blog"].includes(name); // 하위 단계 표시가 있는 화면
   $("crumbSep").classList.toggle("hidden", !sub);
   $("crumb").classList.toggle("hidden", !sub);
   if (!isShorts && name !== "home") {
@@ -1303,3 +1305,187 @@ async function loadActivity() {
 $("activity").onclick = () => alert($("activity").title || "진행 중인 작업이 없어요");
 loadActivity();
 setInterval(loadActivity, 10000);
+
+// ================= 블로그 작성 도우미 =================
+let blBrand = "플레르가구";
+try {
+  blBrand = localStorage.getItem("blBrand") || blBrand;
+} catch {}
+let blDetails = [];
+let blProduct = null; // { zip } | { files, name }
+let blRunNow = null;
+let blPoll = null;
+
+async function blogOpen() {
+  for (const b of $("blSeg").querySelectorAll("button")) b.classList.toggle("on", b.dataset.br === blBrand);
+  const runs = await api("/api/blog/runs").catch(() => []);
+  const live = runs.find((r) => r.running);
+  if (live) return blOpenRun(live.id);
+  if (!blRunNow) blShowInput();
+  blHistory(runs);
+}
+$("blSeg").onclick = (e) => {
+  const b = e.target.closest("[data-br]");
+  if (!b) return;
+  blBrand = b.dataset.br;
+  try {
+    localStorage.setItem("blBrand", blBrand);
+  } catch {}
+  for (const x of $("blSeg").querySelectorAll("button")) x.classList.toggle("on", x.dataset.br === blBrand);
+};
+function blShowInput() {
+  clearInterval(blPoll);
+  blRunNow = null;
+  for (const id of ["blProgress", "blResult"]) $(id).classList.add("hidden");
+  $("blInput").classList.remove("hidden");
+  $("crumb").textContent = "";
+}
+function blSetDetails(items) {
+  blDetails = items.filter((i) => isImg(i.file)).sort(byName);
+  $("blDetailText").textContent = blDetails.length ? `${blDetails.length}장 선택됨 · 다시 놓으면 더해져요` : "상세페이지 이미지나 폴더를 여기에 놓으세요";
+  $("blDetailDrop").classList.toggle("picked", !!blDetails.length);
+  $("blDetail").value = "";
+  $("blDetailDir").value = "";
+}
+function blSetProduct(p) {
+  blProduct = p;
+  const mb = (n) => `${(n / 1e6).toFixed(0)}MB`;
+  $("blPhotoText").textContent = !p ? "제품 사진 폴더를 여기에 놓으세요" : p.zip ? `${p.zip.name} (${mb(p.zip.size)})` : `${p.name ? p.name + " 폴더 · " : ""}사진 ${p.files.filter((i) => isImg(i.file)).length}장`;
+  $("blPhotoDrop").classList.toggle("picked", !!p);
+  if (p && !$("blName").value) $("blName").value = p.zip ? p.zip.name.replace(/\.zip$/i, "") : p.name || "";
+  $("blZip").value = "";
+  $("blPhotoDir").value = "";
+}
+function blProductFrom(items) {
+  const zip = items.find((i) => /\.zip$/i.test(i.file.name));
+  if (zip && items.length === 1) return blSetProduct({ zip: zip.file });
+  const files = items.filter((i) => !/(^|\/)(\.|Thumbs\.db$|desktop\.ini$)/i.test(i.path));
+  if (!files.some((i) => isImg(i.file))) return ($("blErr").textContent = "제품 사진이 든 폴더나 zip 파일을 넣어 주세요");
+  blSetProduct({ files, name: topFolder(files) });
+}
+dropZone($("blDetailDrop"), (items) => blSetDetails([...blDetails, ...items]));
+dropZone($("blPhotoDrop"), blProductFrom);
+$("blDetail").onchange = () => blSetDetails([...blDetails, ...pickedFiles($("blDetail"))]);
+$("blDetailDir").onchange = () => blSetDetails([...blDetails, ...pickedFiles($("blDetailDir"))]);
+$("blPhotoDir").onchange = () => blProductFrom(pickedFiles($("blPhotoDir")));
+$("blZip").onchange = () => $("blZip").files[0] && blSetProduct({ zip: $("blZip").files[0] });
+$("blDetailDrop").addEventListener("click", (e) => !e.target.closest("[data-pick]") && $("blDetail").click());
+$("blPhotoDrop").addEventListener("click", (e) => !e.target.closest("[data-pick]") && $("blPhotoDir").click());
+$("blRun").onclick = async () => {
+  const name = $("blName").value.trim();
+  if (!status?.claude?.connected) return ($("blErr").textContent = "먼저 왼쪽 위 Claude 로그인을 해 주세요");
+  if (!name) return ($("blErr").textContent = "제품명을 입력해 주세요");
+  if (!blDetails.length) return ($("blErr").textContent = "상세페이지 이미지를 넣어 주세요");
+  if (!blProduct) return ($("blErr").textContent = "제품 사진 폴더나 zip 파일을 넣어 주세요");
+  const fd = new FormData();
+  fd.append("brand", blBrand);
+  fd.append("product_name", name);
+  for (const d of blDetails) fd.append("detail", d.file);
+  if (blProduct.zip) fd.append("zip", blProduct.zip);
+  else {
+    fd.append("photo_paths", JSON.stringify(blProduct.files.map((i) => i.path)));
+    for (const i of blProduct.files) fd.append("photos", i.file);
+  }
+  $("blRun").disabled = true;
+  $("blRun").textContent = "자료 보내는 중…";
+  try {
+    const r = await api("/api/blog/runs", { method: "POST", body: fd });
+    $("blName").value = "";
+    blSetDetails([]);
+    blSetProduct(null);
+    $("blErr").textContent = "";
+    await blOpenRun(r.id);
+  } catch (e) {
+    $("blErr").textContent = e.message;
+  } finally {
+    $("blRun").disabled = false;
+    $("blRun").textContent = "블로그 글 쓰기";
+  }
+};
+async function blOpenRun(id) {
+  clearInterval(blPoll);
+  const load = async () => {
+    blRunNow = await api(`/api/blog/runs/${id}`);
+    blRender();
+    if (!blRunNow.running) {
+      clearInterval(blPoll);
+      api("/api/blog/runs").then(blHistory).catch(() => {});
+    }
+  };
+  await load();
+  if (blRunNow.running) blPoll = setInterval(load, 2500);
+}
+function blRender() {
+  const r = blRunNow;
+  $("blInput").classList.add("hidden");
+  $("crumb").textContent = r.product_name || "";
+  if (r.running) {
+    $("blProgress").classList.remove("hidden");
+    $("blResult").classList.add("hidden");
+    const sec = Math.round((Date.now() - new Date(r.started_at)) / 1000);
+    $("blElapsed").textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+    $("blNow").textContent = (r.log || []).filter((l) => !l.startsWith("·")).slice(-1)[0] || "";
+    return;
+  }
+  $("blProgress").classList.add("hidden");
+  $("blResult").classList.remove("hidden");
+  const ok = r.status === "done";
+  const x = r.result || {};
+  $("blStop").classList.toggle("hidden", ok);
+  $("blStop").textContent = ok ? "" : r.error || "";
+  for (const el of $("blResult").querySelectorAll("section")) el.classList.toggle("hidden", !ok);
+  if (!ok) return;
+  $("blAngle").textContent = x.topic?.angle || "";
+  $("blWhy").textContent = x.topic?.why || "";
+  const kw = x.keywords || {};
+  $("blKw").innerHTML = [kw.main && `<span class="kw main">${esc(kw.main)}</span>`, kw.product && `<span class="kw prod">${esc(kw.product)}</span>`, ...(kw.sub || []).map((k) => `<span class="kw">${esc(k)}</span>`)].filter(Boolean).join("");
+  $("blTitles").innerHTML = [x.title, ...(x.title_options || [])]
+    .filter(Boolean)
+    .map((t, i) => `<div class="bl-title${i ? "" : " first"}"><span id="blT${i}">${esc(t)}</span><button class="mini" data-blcopy="blT${i}">복사</button></div>`)
+    .join("");
+  $("blBody").textContent = x.body || "";
+  $("blChars").textContent = x.chars ? `${Number(x.chars).toLocaleString()}자` : "";
+  $("blTags").textContent = (x.tags || []).join(", ");
+  const imgs = x.images || [];
+  $("blImgCount").textContent = imgs.length ? `${imgs.length}장 · 3:2` : "";
+  $("blImgs").innerHTML = imgs.map((n, i) => `<figure><img src="/api/blog/runs/${r.id}/img/${encodeURIComponent(n)}" alt="" loading="lazy"><figcaption>사진 ${i + 1}</figcaption></figure>`).join("");
+  $("blZipBtn").href = `/api/blog/runs/${r.id}/zip`;
+  $("blZipBtn").classList.toggle("hidden", !x.zip);
+  $("blNotes").innerHTML = (x.notes || []).map((n) => `<li>${esc(n)}</li>`).join("");
+}
+$("blResult").onclick = async (e) => {
+  const b = e.target.closest("[data-blcopy]");
+  if (!b) return;
+  await navigator.clipboard.writeText($(b.dataset.blcopy).textContent);
+  const t = b.textContent;
+  b.textContent = "복사됨";
+  setTimeout(() => (b.textContent = t), 1500);
+};
+function blHistory(runs) {
+  const list = (runs || []).filter((r) => !r.running).slice(0, 6);
+  $("blHistory").innerHTML = list.length
+    ? `<div class="active-head">최근 기록</div>` +
+      list
+        .map((r) => {
+          const ok = r.status === "done";
+          return `<div class="active-row ${ok ? "green" : "red"}" data-blrun="${r.id}" role="button" tabindex="0"><span class="name">${esc(r.product_name)}${r.result?.keywords?.main ? ` · ${esc(r.result.keywords.main)}` : ""}</span><span class="tag ${ok ? "green" : "red"}">${ok ? "완성" : "멈춤"}</span><span class="go">보기</span><button class="del" data-bldel="${r.id}">삭제</button></div>`;
+        })
+        .join("")
+    : "";
+  $("blHistory").classList.toggle("hidden", !list.length);
+}
+$("blHistory").onclick = async (e) => {
+  const d = e.target.closest("[data-bldel]");
+  if (d) {
+    if (!confirm("이 기록과 만든 글·사진을 지울까요?")) return;
+    await api(`/api/blog/runs/${d.dataset.bldel}`, { method: "DELETE" }).catch((er) => alert(er.message));
+    if (blRunNow?.id === d.dataset.bldel) blShowInput();
+    return blogOpen();
+  }
+  const r = e.target.closest("[data-blrun]");
+  if (r) blOpenRun(r.dataset.blrun);
+};
+// 사이드바 '블로그 작성 도우미'를 다시 누르면 새로 넣는 화면으로
+document.addEventListener("click", (e) => {
+  if (e.target.closest('a[href="#/blog"]') && route.current === "blog") (blShowInput(), blogOpen());
+});

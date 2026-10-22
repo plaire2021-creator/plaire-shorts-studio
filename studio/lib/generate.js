@@ -125,8 +125,7 @@ function log(job, line) {
   saveJob(job);
 }
 
-export function unzipInto(id, zipPath) {
-  const dest = path.join(jobDir(id), "product");
+export function unzipInto(id, zipPath, dest = path.join(jobDir(id), "product")) {
   const r = spawnSync(PY, ["-X", "utf8", SHORTS, "unzip", zipPath, dest], { encoding: "utf8" });
   if (r.status !== 0) throw new Error("압축 해제 실패: " + (r.stderr || r.stdout).slice(-500));
   return JSON.parse(r.stdout.trim().split(/\r?\n/).pop());
