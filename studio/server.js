@@ -308,6 +308,13 @@ app.post("/api/launch/products", (req, res) => {
     launchErr(res, e);
   }
 });
+app.get("/api/launch/sales", async (req, res) => {
+  try {
+    res.json(await launch.sales(String(req.query.brand || ""), String(req.query.start || ""), String(req.query.end || "")));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
 app.get("/api/launch/lookup", async (req, res) => {
   try {
     res.json(await launch.lookup(req.query.code));

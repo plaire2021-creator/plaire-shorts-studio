@@ -532,3 +532,27 @@
 /* 체험단 미진행 = 빨강 */
 #launchView .reg.no{background:var(--red-soft);border-color:#f6caca;color:var(--red)}
 #launchView .ds-ch.no{background:var(--red-soft);color:var(--red)}
+/* 성과 */
+#launchView .gp-goal h3{margin:0 0 8px}
+#launchView .gp-in{display:flex;gap:22px;flex-wrap:wrap;font-size:13px;color:var(--sub)}
+#launchView .gp-in label{display:inline-flex;align-items:center;gap:6px}
+#launchView .gp-sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#launchView .gp-sum .tile{margin:0;display:grid;gap:6px;align-content:start}
+#launchView .gp-sum .v small{font-size:13px;font-weight:600;color:var(--sub);margin-left:2px}
+#launchView .gp-sum .v.bad{color:var(--red)}
+#launchView .gp-head{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+#launchView .gp-head h3{margin:0}
+#launchView .gp-head .linkbtn{margin-left:auto;font-size:12px}
+#launchView .gp-lg{display:flex;gap:12px;font-size:12px;color:var(--sub)}
+#launchView .gp-lg span{display:inline-flex;align-items:center;gap:5px}
+#launchView .gp-lg i{width:9px;height:9px;border-radius:3px;display:inline-block}
+#launchView .gp-wk{display:grid;grid-template-columns:120px minmax(0,1fr) 60px 110px minmax(0,1.2fr);align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+#launchView .gp-wl{display:grid}
+#launchView .gp-bar{display:flex;height:14px;border-radius:7px;background:var(--bg);overflow:hidden}
+#launchView .gp-bar i{display:block;height:100%}
+#launchView .gp-q{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+#launchView .gp-a{text-align:right;font-variant-numeric:tabular-nums}
+#launchView .gp-memo{width:100%}
+#launchView .gp-link h3{margin:0 0 4px}
+#launchView .gp-lrow{display:grid;grid-template-columns:100px minmax(0,1fr) 240px;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+@media (max-width:900px){#launchView .gp-sum{grid-template-columns:repeat(2,minmax(0,1fr))}#launchView .gp-wk{grid-template-columns:90px minmax(0,1fr) 50px}#launchView .gp-a,#launchView .gp-memo{display:none}#launchView .gp-lrow{grid-template-columns:1fr}}

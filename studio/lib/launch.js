@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { DATA_DIR, PLUGIN_ROOT } from "./store.js";
+import { weeklyDir } from "./weekly.js";
 
 const DIR = path.join(DATA_DIR, "launch");
 const PDIR = path.join(DIR, "products");
@@ -118,6 +119,24 @@ export function lookup(code) {
         return r.error ? reject(new Error(r.error)) : resolve(r);
       } catch {
         reject(new Error(err?.killed ? "구글 시트가 늦게 응답해요. 잠시 후 다시 해 주세요" : "구글 시트를 읽지 못했어요"));
+      }
+    });
+  });
+}
+
+// 성과 탭: 주간 매출 통계 결과 파일에서 기간 안의 주차별·채널별 판매(상품 단위)를 꺼낸다
+export function sales(brand, start, end) {
+  if (!["플레르가구", "가즈다가구"].includes(brand)) return Promise.reject(new Error("브랜드를 골라 주세요"));
+  const ok = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ""));
+  if (!ok(start) || !ok(end)) return Promise.reject(new Error("기간이 올바르지 않아요"));
+  return new Promise((resolve, reject) => {
+    const py = process.platform === "win32" ? "python" : "python3";
+    execFile(py, [path.join(PLUGIN_ROOT, "scripts", "launch_sales.py"), weeklyDir().dir, brand, start, end], { encoding: "utf8", timeout: 90000, maxBuffer: 20 * 1024 * 1024, env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" }, windowsHide: true }, (err, out) => {
+      try {
+        const r = JSON.parse(String(out || "").trim().split("\n").pop());
+        return r.error ? reject(new Error(r.error)) : resolve(r);
+      } catch {
+        reject(new Error("주간 매출 파일을 읽지 못했어요"));
       }
     });
   });

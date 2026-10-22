@@ -241,11 +241,71 @@ function vWork(){
   const M = [['prog','진행현황표'],['check','채널별 체크리스트'],['flow','업무 순서']];
   return `<div class="seg ln-sub">${M.map(([k,l])=>`<button data-wmode="${k}" class="${workMode===k?'on':''}">${l}</button>`).join('')}</div>` + ({prog:vProg, check:vCheck, flow:vFlow}[workMode])();
 }
-// 목표·성과 = 판매 목표·비용 + 성과 분석
-function vGP(){
-  const M = [['goal','판매 목표·비용'],['perf','성과 분석']];
-  return `<div class="seg ln-sub">${M.map(([k,l])=>`<button data-gmode="${k}" class="${goalMode===k?'on':''}">${l}</button>`).join('')}</div>` + ({goal:vGoal, perf:vPerf}[goalMode])();
+// 성과: 목표 3칸만 적고, 실적은 주간 매출 통계 파일에서 이 제품 판매를 골라 자동으로 채운다 (채널은 스마트스토어·쿠팡·오늘의집 고정)
+const CH3 = [['스마트스토어','네이버'],['쿠팡','쿠팡'],['오늘의집','오늘의집']]; // [화면 이름, 파일·시트 이름]
+const CH_COL = {네이버:'var(--green)', 쿠팡:'var(--blue)', 오늘의집:'var(--amber)'};
+let salesData = {}; // 제품 id → {weeks} | {err} | 'loading'
+const won0 = n => Math.round(n||0).toLocaleString('ko-KR');
+const prodMatches = () => (S.product.sheet?.matches||[]).filter(m=>!prodBrand() || m.brand===prodBrand());
+const chIds = ch => new Set(prodMatches().flatMap(m=>m.ext?.[ch]?.ids||[]));
+function chMargin(ch){ const ms = prodMatches().map(m=>m.ext?.[ch]?.margin||0).filter(v=>v>0); return ms.length ? ms.reduce((a,b)=>a+b,0)/ms.length : 0; }
+function blockHit(ch, b){ const kw = (S.salesKey?.[ch]||'').replace(/\s/g,''), ids = chIds(ch); return b.ids.some(i=>ids.has(i)) || (kw.length>=2 && b.name.replace(/\s/g,'').includes(kw)); }
+async function loadSales(force){
+  const pid = PID, brand = prodBrand();
+  if(!brand){ salesData[pid] = {err:'제품 정보에서 브랜드를 골라 주세요'}; return render(); }
+  if(salesData[pid] && !force) return;
+  salesData[pid] = 'loading'; if(force) render();
+  try{
+    const r = await fetch(`/api/launch/sales?brand=${encodeURIComponent(brand)}&start=${S.product.launch}&end=${addD(S.product.launch,34)}`);
+    const j = await r.json(); if(!r.ok) throw new Error(j.error || '주간 매출을 읽지 못했어요');
+    salesData[pid] = {weeks: j.weeks};
+  }catch(e){ salesData[pid] = {err: e.message}; }
+  if(pid === PID && tab==='gp') render();
 }
+function vGP(){
+  const g = S.goal = S.goal || {}, memo = S.weekMemo = S.weekMemo || {}; S.salesKey = S.salesKey || {};
+  // 예전에 찾은 시트 결과에 채널 ID·마진이 없으면 한 번 다시 찾는다
+  if(S.product.code && S.product.sheet && prodMatches().length && !prodMatches().some(m=>m.ext) && !lookingUp) setTimeout(lookupCode, 50);
+  const sd = salesData[PID]; if(!sd) setTimeout(()=>loadSales(false), 0);
+  let h = `<div class="panel gp-goal"><h3>목표</h3><div class="gp-in">
+    <label>1개월 목표 판매 <input type="number" min="0" class="xd-num" data-goal="qty" value="${g.qty||''}" placeholder="0"> 대</label>
+    <label>마케팅 예산 <input type="number" min="0" step="10000" class="xd-num xd-money" data-goal="budget" value="${g.budget||''}" placeholder="0"> 원</label>
+    <label>목표 리뷰 <input type="number" min="0" class="xd-num" data-goal="reviewGoal" value="${g.reviewGoal||''}" placeholder="0"> 건</label>
+    <label>지금 리뷰 <input type="number" min="0" class="xd-num" data-goal="reviewNow" value="${g.reviewNow||''}" placeholder="0"> 건</label></div></div>`;
+  if(!S.product.code) return h + `<div class="panel"><p class="note">제품 정보에 상품 코드를 넣으면 주간 매출 통계에서 이 제품 판매를 자동으로 가져와요.</p></div>`;
+  if(!sd || sd==='loading') return h + `<div class="panel"><p class="note">주간 매출 통계에서 이 제품 판매를 찾는 중…</p></div>`;
+  if(sd.err) return h + `<div class="panel"><p class="bad">${esc(sd.err)}</p><button class="btn small" id="lnSalesReload">다시 불러오기</button></div>`;
+  // 주차별·채널별 합계 (이 제품으로 골라낸 상품만)
+  const weeks = sd.weeks.map(w=>{ const ch = {}; CH3.forEach(([,k])=>{ const bs=(w.ch[k]||[]).filter(b=>blockHit(k,b)); ch[k]={qty:bs.reduce((a,b)=>a+b.qty,0), amount:bs.reduce((a,b)=>a+b.amount,0), names:bs.map(b=>b.name)}; });
+    return {...w, ch, qty:CH3.reduce((a,[,k])=>a+ch[k].qty,0), amount:CH3.reduce((a,[,k])=>a+ch[k].amount,0)}; });
+  const tq = weeks.reduce((a,w)=>a+w.qty,0), ta = weeks.reduce((a,w)=>a+w.amount,0);
+  const byCh = Object.fromEntries(CH3.map(([,k])=>[k, weeks.reduce((a,w)=>a+w.ch[k].qty,0)]));
+  const margin = CH3.reduce((a,[,k])=>a+byCh[k]*chMargin(k),0), profit = margin - (+g.budget||0), noMargin = !CH3.some(([,k])=>chMargin(k));
+  const gq = +g.qty||0, p = gq ? Math.min(100, Math.round(tq/gq*100)) : 0;
+  h += `<div class="gp-sum">
+    <div class="tile"><div class="k">판매</div><div class="v">${won0(tq)}${gq?` <small>/ ${gq}대</small>`:'대'}</div><div class="bar"><i style="width:${p}%"></i></div><div class="s">${gq?`목표의 ${p}%`:'목표 판매를 적으면 달성률이 나와요'}</div></div>
+    <div class="tile"><div class="k">매출</div><div class="v">${won0(ta)}<small>원</small></div><div class="s">${CH3.map(([n,k])=>`${n} ${tq?Math.round(byCh[k]/tq*100):0}%`).join(' · ')}</div></div>
+    <div class="tile"><div class="k">예상 순이익</div><div class="v ${profit<0?'bad':''}">${won0(profit)}<small>원</small></div><div class="s">${noMargin?'시트에 마진(회원 구매 수익)이 없어요':`마진 ${won0(margin)} − 예산 ${won0(+g.budget||0)}`}</div></div>
+    <div class="tile"><div class="k">리뷰</div><div class="v">${+g.reviewNow||0}${+g.reviewGoal?` <small>/ ${g.reviewGoal}건</small>`:'건'}</div><div class="s">${+g.reviewGoal?`목표의 ${Math.min(100,Math.round((+g.reviewNow||0)/g.reviewGoal*100))}%`:'목표 리뷰를 적으면 달성률이 나와요'}</div></div></div>`;
+  // 주차별 판매
+  const mx = Math.max(1, ...weeks.map(w=>w.qty));
+  h += `<div class="panel"><div class="gp-head"><h3>주차별 판매</h3><span class="gp-lg">${CH3.map(([n,k])=>`<span><i style="background:${CH_COL[k]}"></i>${n}</span>`).join('')}</span><button class="linkbtn" id="lnSalesReload">새로고침</button></div>`;
+  h += weeks.length ? weeks.map(w=>{ const wi = Math.floor((parse(w.start)-parse(S.product.launch))/864e5/7)+1;
+      return `<div class="gp-wk"><span class="gp-wl"><b>${wi<1?'출시 주':wi+'주차'}</b><span class="note">${md(w.start)}~${md(w.end)}</span></span>
+        <span class="gp-bar">${CH3.map(([n,k])=>w.ch[k].qty?`<i style="width:${w.ch[k].qty/mx*100}%;background:${CH_COL[k]}" title="${n} ${w.ch[k].qty}대"></i>`:'').join('')}</span>
+        <span class="gp-q">${won0(w.qty)}대</span><span class="gp-a note">${won0(w.amount)}원</span>
+        <input type="text" class="xd-in gp-memo" data-wmemo="${w.start}" value="${esc(memo[w.start]||'')}" placeholder="메모 (예: 광고 입찰 올림)"></div>`; }).join('')
+    : `<p class="note">아직 출시 기간의 주간 매출 통계가 없어요. 주간 매출 통계를 돌리면 여기에 자동으로 채워져요.</p>`;
+  h += `</div>`;
+  // 판매 데이터 연결 (어떤 상품을 이 제품으로 셌는지)
+  h += `<div class="panel gp-link"><h3>판매 데이터 연결</h3><p class="note">상품등록 현황 시트의 링크 속 상품 ID로 이 제품 판매를 골라요. ID로 안 잡히는 채널은 상품명에 들어가는 단어를 적어 주세요.</p>`;
+  CH3.forEach(([n,k])=>{ const ids = chIds(k), names = [...new Set(weeks.flatMap(w=>w.ch[k].names))];
+    h += `<div class="gp-lrow"><b>${n}</b><span class="note">${ids.size?`상품 ID ${ids.size}개로 연결`:'시트에 상품 ID 없음'}${names.length?` · 찾은 상품: ${esc(names.slice(0,2).join(', '))}${names.length>2?' 외':''}`:' · 찾은 판매 없음'}</span>
+      <input type="text" class="xd-in" data-skey="${k}" value="${esc(S.salesKey[k]||'')}" placeholder="상품명에 이 단어가 있으면 포함"></div>`; });
+  h += `</div>`;
+  return h;
+}
+
 
 /* ---------- 탭: 업무 순서 ---------- */
 function vFlow(){
@@ -513,7 +573,7 @@ function vCal(){
 }
 
 /* ---------- 렌더·이벤트 ---------- */
-const TABS = [['dash','대시보드',vDash],['sched','일정',vCal],['exp','체험단',vExp],['gp','목표·성과',vGP]];
+const TABS = [['dash','대시보드',vDash],['sched','일정',vCal],['exp','체험단',vExp],['gp','성과',vGP]];
 function shell(){
   ROOT.innerHTML = `<div class="welcome" id="lnWelcome"><h1>신제품 출시 매뉴얼</h1><p>제품마다 상품을 등록한 날(D-day)부터 채널별 할 일·체험단·판매 목표·성과를 한곳에서 챙겨요. 고친 내용은 자동으로 저장되고 팀 모두에게 똑같이 보여요.</p></div>
   <div id="lnList" class="ln-stack"></div>
@@ -540,6 +600,7 @@ document.addEventListener('click', e=>{
   const b = e.target.closest('button'); if(!b) return;
   if(b.id==='lnBack'){ backToList(); return; }
   if(b.id==='lnLookup'){ lookupCode(); return; }
+  if(b.id==='lnSalesReload'){ loadSales(true); return; }
   if(b.dataset.wmode){ workMode=b.dataset.wmode; editPeriod=-1; openCol=null; render(); return; }
   if(b.dataset.gmode){ goalMode=b.dataset.gmode; render(); return; }
   if(b.dataset.hold){ const [ci,ii]=b.dataset.hold.split('-').map(Number), it=S.checklists[ci].items[ii];
@@ -640,6 +701,9 @@ document.addEventListener('change', e=>{
       x.people=x.people.slice(0,n); } markDirty(); render(); return; }
   if(ds.xpd && el.value){ const [xi,si]=ds.xpd.split('-').map(Number), x=S.exp[xi], st=x.steps[si]; st[ds.f]=Math.round((parse(el.value)-parse(x.start))/864e5); if(st.e<st.s){ if(ds.f==='s') st.e=st.s; else st.s=st.e; } markDirty(); render(el.id); return; }
   if(ds.xp){ const [xi,si]=ds.xp.split('-').map(Number); S.exp[xi].steps[si][ds.f]=el.value; markDirty(); if(ds.f==='st') render(); else renderTop(); return; }
+  if(ds.goal){ S.goal=S.goal||{}; S.goal[ds.goal]=num(el.value); markDirty(); render(); return; }
+  if(ds.wmemo){ S.weekMemo=S.weekMemo||{}; S.weekMemo[ds.wmemo]=el.value; markDirty(); return; }
+  if(ds.skey){ S.salesKey=S.salesKey||{}; S.salesKey[ds.skey]=el.value.trim(); markDirty(); render(); return; }
   if(ds.xr){ const [xi,ri]=ds.xr.split('-').map(Number), r=S.exp[xi].results[ri]; let v=el.value.trim();
     if(ds.f==='what' && v && !/^https?:\/\//i.test(v) && /^[^\s]+\.[a-z]{2,}(\/\S*)?$/i.test(v)) v='https://'+v;
     r[ds.f]=v; markDirty(); if(ds.f==='what') render(); else renderTop(); return; }
@@ -678,7 +742,7 @@ document.addEventListener('change', e=>{
     else if(ds.f==='ch'){ const to=+el.value; if(to!==t._ci){ S.checklists[t._ci].items.splice(t._ii,1); S.checklists[to].items.push(t); } }
     else t[ds.f]=el.value;
     markDirty(); if(['st','step','ch'].includes(ds.f)) render(); else renderTop(); return; }
-  if(el.id==='pf-brand'){ S.product.brand=el.value; applySheet(); markDirty(); render(); return; }
+  if(el.id==='pf-brand'){ S.product.brand=el.value; applySheet(); delete salesData[PID]; markDirty(); render(); return; }
   if(el.id==='pf-code'){ S.product.code=el.value.trim(); lookErr=''; markDirty(); lookupCode(); return; }
   if(el.id==='pf-name'){ S.product.name=el.value; markDirty(); return; }
   if(el.id==='pf-launch' && el.value){ S.product.launch=el.value; calMonth=null; markDirty(); render(); return; }
