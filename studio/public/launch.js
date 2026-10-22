@@ -305,7 +305,7 @@ function vExp(){
   h += `<div class="xd-sec">진행 상황</div>`;
   x.steps.forEach((st,si)=>{
     const lt = xLate(x,st), s2 = lt ? '지연' : st.st, key = xi+'-'+si;
-    h += `<div class="td-row xd-row ${st.st==='완료'?'done':''}"><input type="checkbox" id="xk-${key}" data-xck="${key}" ${st.st==='완료'?'checked':''} aria-label="완료"><input type="text" class="xd-in xd-step" id="xp-${key}-name" data-xp="${key}" data-f="name" value="${esc(st.name)}" placeholder="할 일을 적어 주세요">${ownerSel(`xo-${key}`, `class="td-owner" data-xp="${key}" data-f="owner"`, st.owner)}<input type="date" class="mc-date" data-xpd="${key}" data-f="e" value="${xEnd(x,st)}" aria-label="마감일"><button class="pill st-${s2} hold-t" data-xhold="${key}" title="${st.st==='보류'?'누르면 보류를 풀어요':'누르면 보류로 바꿔요'}">${s2}</button><button class="btn small ghost" data-xpdel="${key}" aria-label="항목 삭제">✕</button></div>`;
+    h += `<div class="td-row xd-row ${st.st==='완료'?'done':''}"><input type="checkbox" id="xk-${key}" data-xck="${key}" ${st.st==='완료'?'checked':''} aria-label="완료"><input type="text" class="xd-in xd-step" id="xp-${key}-name" data-xp="${key}" data-f="name" value="${esc(st.name)}" placeholder="할 일을 적어 주세요">${ownerSel(`xo-${key}`, `class="td-owner" data-xp="${key}" data-f="owner"`, st.owner)}<span class="note xd-dl">마감일</span><input type="date" class="mc-date" data-xpd="${key}" data-f="e" value="${xEnd(x,st)}" aria-label="마감일"><button class="pill st-${s2} hold-t" data-xhold="${key}" title="${st.st==='보류'?'누르면 보류를 풀어요':'누르면 보류로 바꿔요'}">${s2}</button><button class="btn small ghost" data-xpdel="${key}" aria-label="항목 삭제">✕</button></div>`;
   });
   if(!x.steps.length) h += `<p class="note">아직 적은 진행 상황이 없어요.</p>`;
   h += `<div class="ds-foot"><button class="btn small" data-xpadd="${xi}">+ 항목 추가</button></div>`;
@@ -317,7 +317,7 @@ function vExp(){
     h += `<div class="xd-p"><input type="text" class="xd-in" list="xr-names-${xi}" data-xr="${key}" data-f="who" value="${esc(r.who||'')}" placeholder="누가" aria-label="누가">
       <input type="text" class="xd-in xd-where" data-xr="${key}" data-f="where" value="${esc(r.where||'')}" placeholder="어디에 (블로그·인스타 등)" aria-label="어디에">
       <input type="text" class="xd-in xd-url" data-xr="${key}" data-f="what" value="${esc(r.what||'')}" placeholder="무엇을 (게시물 링크나 내용)" aria-label="무엇을">${/^https?:\/\//.test(r.what||'')?`<a class="td-open" href="${esc(r.what)}" target="_blank" rel="noopener">열기 ↗</a>`:''}
-      <input type="date" class="mc-date" data-xr="${key}" data-f="date" value="${r.date||''}" aria-label="올린 날">
+      <span class="note xd-dl">게시일</span><input type="date" class="mc-date" data-xr="${key}" data-f="date" value="${r.date||''}" aria-label="게시일">
       <button class="btn small ghost" data-xrdel="${key}" aria-label="결과 삭제">✕</button></div>`;
   });
   h += `<datalist id="xr-names-${xi}">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`;

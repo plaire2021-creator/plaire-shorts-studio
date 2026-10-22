@@ -525,3 +525,4 @@
 #launchView .td-row input.xd-step{flex:1;min-width:0;width:auto;height:auto;accent-color:auto}
 #launchView .xd-where{width:180px}
 #launchView .xd-p input.xd-in:first-of-type{width:170px}
+#launchView .xd-dl{white-space:nowrap;margin-right:-4px;flex:none}
