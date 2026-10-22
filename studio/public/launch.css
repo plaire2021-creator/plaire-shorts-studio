@@ -515,3 +515,6 @@
 @media (max-width:900px){#launchView .xc-grid{grid-template-columns:1fr}#launchView .xd-p{flex-wrap:wrap}}
 #launchView .td-row input.mc-date{width:auto;height:auto;accent-color:auto;flex:none}
 #launchView input.mc-date{min-width:128px}
+/* 달력 칸 글자는 자르지 말고 줄바꿈 */
+#launchView .mc-ev{white-space:normal;overflow:visible;text-overflow:clip;align-items:flex-start;word-break:keep-all;overflow-wrap:anywhere}
+#launchView .mc-ev i{margin-top:5px}

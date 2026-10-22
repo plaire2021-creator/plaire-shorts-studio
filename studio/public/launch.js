@@ -450,7 +450,7 @@ function calDays(){
   const grp = (d,k,o) => { const m = (days[d] = days[d] || new Map()); if(!m.has(k)) m.set(k, {...o, items:[]}); return m.get(k); };
   TK().forEach(t=>{
     const it = {name:bare(t.name), ch:t.ch, owner:t.owner, st:t.st, late:isLate(t), ref:'t-'+t._ci+'-'+t._ii};
-    if(t.rec==='weekly'){ for(let n=Math.max(0,t.s); n<=t.e; n++){ const d = addD(L,n); if(new Date(parse(d)).getUTCDay()===1) grp(d,'w',{order:99, label:'주간 체크', weekly:1}).items.push({...it, late:false}); } return; }
+    if(t.rec==='weekly') return; // 매주 반복 업무는 달력에 안 넣는다
     grp(tEnd(t), 's'+t.step, {order:t.step||98, label:stepName(t.step)||'기타'}).items.push(it);
   });
   const xn = EXPN();
@@ -469,7 +469,7 @@ function vCal(){
   const first = Date.UTC(y,m-1,1), startDow = new Date(first).getUTCDay(), days = calDays();
   const cells = (startDow + new Date(Date.UTC(y,m,0)).getUTCDate()) > 35 ? 42 : 35;
   let h = `<div class="mc-head"><button class="btn small" id="calPrev" aria-label="이전 달">◀</button><b>${y}년 ${m}월</b><button class="btn small" id="calNext" aria-label="다음 달">▶</button><button class="btn small" id="calToday">오늘</button>
-    <span class="mc-lg"><span><i class="todo"></i>마감</span><span><i class="late"></i>마감 지남</span><span><i class="done"></i>끝남</span><span>↻ 매주 반복</span></span></div>
+    <span class="mc-lg"><span><i class="todo"></i>마감</span><span><i class="late"></i>마감 지남</span><span><i class="done"></i>끝남</span></span></div>
     <div class="mcal">${WD.map(w=>`<div class="mc-wd">${w}</div>`).join('')}`;
   for(let i=0;i<cells;i++){
     const t = first + (i-startDow)*864e5, d = fmt(t), dt = new Date(t), out = dt.getUTCMonth()!==m-1;
