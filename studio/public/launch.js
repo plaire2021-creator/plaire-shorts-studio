@@ -77,11 +77,38 @@ function renderTop(){
 }
 function renderInfo(){
   $('#lnInfo').innerHTML = `<div class="li-head"><button class="mini" id="lnBack">← 제품 목록</button><h3>제품 정보</h3><span class="tag blue">${dlabel(dnum(TODAY))}</span>${S.product.memo?`<span class="tag amber" title="${esc(S.product.memo)}">예시</span>`:''}<span class="tag" id="lnSave"></span></div>
-  <div class="prodform">
+  <div class="prodform li-form">
+    <label>상품 코드 (옵션코드)<input id="pf-code" type="text" value="${esc(S.product.code||'')}" placeholder="예: 블랑누아거실장2600"></label>
     <label>제품명<input id="pf-name" type="text" value="${esc(S.product.name)}"></label>
     <label>출시일 (상품 등록일, D-day)<input id="pf-launch" type="date" value="${S.product.launch}"></label>
     <label>카테고리<input id="pf-cat" type="text" value="${esc(S.product.category)}"></label>
-  </div><p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다. 제품을 지우려면 「← 제품 목록」에서 지우세요.</p>`;
+  </div>${sheetBox()}<p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다. 제품을 지우려면 「← 제품 목록」에서 지우세요.</p>`;
+}
+// 상품 코드로 구글 시트(플레르가구·가즈다가구 상품등록 현황)에서 찾은 결과 — 제품에 같이 저장해서 팀 모두 같은 걸 본다
+let lookingUp = false, lookErr = '';
+function sheetBox(){
+  const sh = S.product.sheet;
+  if(lookingUp) return `<div class="li-sheet"><p class="note">구글 시트에서 '${esc(S.product.code)}'을(를) 찾는 중…</p></div>`;
+  if(lookErr) return `<div class="li-sheet bad"><p>${esc(lookErr)}</p><button class="btn small" id="lnLookup">다시 찾기</button></div>`;
+  if(!S.product.code) return `<div class="li-sheet"><p class="note">상품 코드를 넣으면 구글 시트 「플레르가구 상품등록 현황」·「가즈다가구 상품등록 현황」에서 어떤 제품인지 찾아 보여 줘요.</p></div>`;
+  if(!sh || sh.query !== S.product.code) return `<div class="li-sheet"><button class="btn small" id="lnLookup">구글 시트에서 찾기</button></div>`;
+  if(!sh.matches.length) return `<div class="li-sheet bad"><p>두 시트 어디에도 '${esc(sh.query)}'이(가) 없어요. 옵션코드를 다시 확인해 주세요.</p><button class="btn small" id="lnLookup">다시 찾기</button></div>`;
+  const brands = [...new Set(sh.matches.map(m=>m.brand))], names = [...new Set(sh.matches.map(m=>m.name.replace(/,\s*[^,]*$/,'')))];
+  return `<div class="li-sheet"><div class="ls-head"><b>구글 시트 확인</b>${brands.map(b=>`<span class="tag ${b==='가즈다가구'?'amber':'blue'}">${esc(b)}</span>`).join('')}<span class="ls-name">${esc(names[0])}${names.length>1?` 외 ${names.length-1}개`:''}</span><span class="note">옵션 ${sh.total}개${sh.total>sh.matches.length?` 중 ${sh.matches.length}개 표시`:''} · ${sh.by}로 찾음 · ${esc(String(sh.at||'').slice(5,16).replace('T',' '))} 기준</span><button class="btn small" id="lnLookup">새로 확인</button></div>
+    <div class="tw"><table class="ls-tbl"><thead><tr><th>옵션코드</th><th>사이즈</th><th>색상</th>${sh.matches[0].channels.map(c=>`<th class="num">${c.ch}</th>`).join('')}</tr></thead><tbody>${sh.matches.map(m=>`<tr><td>${esc(m.code)}</td><td>${esc(m.size)}</td><td>${esc(m.color)}</td>${m.channels.map(c=>`<td class="num">${c.on?`<span class="pill st-완료">등록</span> ${esc(c.price)}`:'<span class="note">미등록</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+}
+async function lookupCode(){
+  const code = (S.product.code||'').trim(); if(!code) return;
+  const pid = PID; lookingUp = true; lookErr = ''; render();
+  try{
+    const r = await fetch('/api/launch/lookup?code=' + encodeURIComponent(code));
+    const j = await r.json().catch(()=>({}));
+    if(pid !== PID) return;
+    if(!r.ok) throw new Error(j.error || '구글 시트를 읽지 못했어요');
+    S.product.sheet = { query: code, by: j.by, total: j.total, matches: j.matches, at: new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString() };
+    markDirty();
+  }catch(e){ if(pid === PID) lookErr = e.message; }
+  finally{ if(pid === PID){ lookingUp = false; render(); } }
 }
 
 /* ---------- 계산 ---------- */
@@ -488,6 +515,7 @@ document.addEventListener('click', e=>{
   if(row && !e.target.closest('button')){ openProduct(row.dataset.lnopen); return; }
   const b = e.target.closest('button'); if(!b) return;
   if(b.id==='lnBack'){ backToList(); return; }
+  if(b.id==='lnLookup'){ lookupCode(); return; }
   if(b.dataset.wmode){ workMode=b.dataset.wmode; editPeriod=-1; openCol=null; render(); return; }
   if(b.dataset.gmode){ goalMode=b.dataset.gmode; render(); return; }
   if(b.dataset.dsopen){ const n=+b.dataset.dsopen; openSt.has(n)?openSt.delete(n):openSt.add(n); render(); return; }
@@ -593,6 +621,7 @@ document.addEventListener('change', e=>{
     else if(ds.f==='ch'){ const to=+el.value; if(to!==t._ci){ S.checklists[t._ci].items.splice(t._ii,1); S.checklists[to].items.push(t); } }
     else t[ds.f]=el.value;
     markDirty(); if(['st','step','ch'].includes(ds.f)) render(); else renderTop(); return; }
+  if(el.id==='pf-code'){ S.product.code=el.value.trim(); lookErr=''; markDirty(); lookupCode(); return; }
   if(el.id==='pf-name'){ S.product.name=el.value; markDirty(); return; }
   if(el.id==='pf-launch' && el.value){ S.product.launch=el.value; calMonth=null; markDirty(); render(); return; }
   if(el.id==='pf-cat'){ S.product.category=el.value; markDirty(); return; }
@@ -664,7 +693,7 @@ function lnRows(title, list, empty){
 }
 async function openProduct(id){
   await flush();
-  PID = id; S = null; VER = 0; rev = savedRev = 0; dirty = false; saveErr = '';
+  PID = id; S = null; lookingUp = false; lookErr = ''; VER = 0; rev = savedRev = 0; dirty = false; saveErr = '';
   calMonth = null; expSel = 'all'; expEdit = ''; expMonth = null; expHide = {}; calHide = {}; CF = {}; openCol = null; editPeriod = -1; delPlat = -1; perfCp = 'W1'; resetArm = false;
   try{ await load(); }catch(_){ alert('이 제품을 불러오지 못했어요. 목록을 다시 볼게요.'); return showList(); }
   openSt = new Set(S.steps.map((_,i)=>i+1).filter(n=>n!==13 && stepStatus(n)==='지연'));

@@ -3,8 +3,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { DATA_DIR } from "./store.js";
+import { DATA_DIR, PLUGIN_ROOT } from "./store.js";
 
 const DIR = path.join(DATA_DIR, "launch");
 const PDIR = path.join(DIR, "products");
@@ -102,6 +103,22 @@ export function save(id, version, state) {
   const next = { ...cur, version: cur.version + 1, saved_at: new Date().toISOString(), state };
   write(id, next);
   return next;
+}
+
+// 상품 코드(옵션코드)로 구글 시트 두 개(플레르가구·가즈다가구 상품등록 현황)에서 제품 찾기
+export function lookup(code) {
+  return new Promise((resolve, reject) => {
+    const py = process.platform === "win32" ? "python" : "python3";
+    execFile(py, [path.join(PLUGIN_ROOT, "scripts", "product_lookup.py"), String(code || "").slice(0, 100)], { encoding: "utf8", timeout: 90000, env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" }, windowsHide: true }, (err, out) => {
+      const last = String(out || "").trim().split("\n").pop();
+      try {
+        const r = JSON.parse(last);
+        return r.error ? reject(new Error(r.error)) : resolve(r);
+      } catch {
+        reject(new Error(err?.killed ? "구글 시트가 늦게 응답해요. 잠시 후 다시 해 주세요" : "구글 시트를 읽지 못했어요"));
+      }
+    });
+  });
 }
 
 // 지운 제품은 바로 없애지 않고 deleted 폴더로 옮겨 둔다 (실수로 지웠을 때 되살릴 수 있게)
