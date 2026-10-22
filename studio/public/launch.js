@@ -215,7 +215,7 @@ function vDash(){
       if(open) body = `<div class="reg-list">${S.exp.map(x=>{ const go=goOf(x), done = go==='진행' && x.steps.length && x.steps.every(a=>a.st==='완료'||a.st==='보류');
           const [c,l] = done ? ['on','완료'] : go==='진행' ? ['ing','진행'] : ['', go];
           return `<span class="reg ${c}">${esc(x.name)} <em>${l}</em></span>`; }).join('')}</div>`
-        + `<div class="ds-foot"><button class="btn small" data-goexp="all">체험단 탭에서 관리</button></div>`;
+        + `<p class="reg-note">체험단 탭에서 진행 여부와 진행 상황을 관리해요. 진행 상황을 모두 체크하면 자동으로 완료돼요. <button class="linkbtn" data-goexp="all">체험단 탭으로 가기</button></p>`;
     } else {
       const ts = stepTasks(n), r = stepRange(n);
       d = ts.filter(t=>t.st==='완료'||t.st==='보류').length; tot = ts.length; rng = r ? md(addD(S.product.launch,r.s))+' ~ '+md(addD(S.product.launch,r.e)) : '업무 없음';
@@ -225,7 +225,7 @@ function vDash(){
       if(open && sheetOnly){
         const sh = S.product.sheet, at = sh?.at ? `마지막 확인 ${String(sh.at).slice(5,10).replace('-','/')} ${String(sh.at).slice(11,16)}` : '';
         body = `<div class="reg-list">${ts.map(t=>`<span class="reg ${t.st==='완료'?'on':''}">${t.st==='완료'?'✓':'○'} ${esc(bare(t.name).replace(/\s*상품등록$/,''))}</span>`).join('')}</div>
-          <p class="reg-note">${S.product.code ? `구글 시트 「상품등록 현황」에 등록(O)하면 자동으로 체크돼요.${at?' · '+at:''} <button class="linkbtn" id="lnLookup">지금 확인</button>` : '제품 정보에 상품 코드를 넣으면 구글 시트 「상품등록 현황」을 보고 자동으로 체크돼요.'}</p>`;
+          <p class="reg-note">${S.product.code ? `구글 시트 「상품등록 현황」에 등록(O)하면 자동으로 체크돼요.${at?' · '+at:''} <button class="linkbtn" id="lnLookup">새로고침</button>` : '제품 정보에 상품 코드를 넣으면 구글 시트 「상품등록 현황」을 보고 자동으로 체크돼요.'}</p>`;
       } else if(open) body = ts.map(t=>{ const lt = isLate(t), s2 = lt ? '지연' : t.st;
         if(contentStep(n)) return `<div class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)}</small></span>${ownerSel(`ow-${t._ci}-${t._ii}`, `class="td-owner" data-own2="${t._ci}-${t._ii}"`, t.owner)}${lt?`<span class="td-d bad">${dnum(TODAY)-t.e}일 지남</span>`:''}<span class="td-linkbox">${t.url?`<a class="td-open" href="${esc(t.url)}" target="_blank" rel="noopener" title="${esc(t.url)}">열기 ↗</a>`:''}<input class="td-link" type="url" id="lk-${t._ci}-${t._ii}" data-lnk="${t._ci}-${t._ii}" value="${esc(t.url||'')}" placeholder="게시물 링크 붙여넣기" aria-label="${esc(bare(t.name))} 링크"></span><button class="pill st-${s2} hold-t" data-hold="${t._ci}-${t._ii}" title="${t.st==='보류'?'누르면 보류를 풀어요':'누르면 보류로 바꿔요'}">${s2}</button></div>`;
         return `<label class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)}${t.rec==='weekly'?' · 매주 월요일':''}</small></span>${ownerSel(`ow-${t._ci}-${t._ii}`, `class="td-owner" data-own2="${t._ci}-${t._ii}"`, t.owner)}${lt?`<span class="td-d bad">${dnum(TODAY)-t.e}일 지남</span>`:''}<button class="pill st-${s2} hold-t" data-hold="${t._ci}-${t._ii}" title="${t.st==='보류'?'누르면 보류를 풀어요':'누르면 보류로 바꿔요'}">${s2}</button></label>`; }).join('')
