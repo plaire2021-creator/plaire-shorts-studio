@@ -82,7 +82,7 @@ function renderInfo(){
     <label>제품명<input id="pf-name" type="text" value="${esc(S.product.name)}"></label>
     <label>출시일 (상품 등록일, D-day)<input id="pf-launch" type="date" value="${S.product.launch}"></label>
     <label>카테고리<input id="pf-cat" type="text" value="${esc(S.product.category)}"></label>
-  </div><p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다. 제품을 지우려면 「← 제품 목록」에서 지우세요.</p>`;
+  </div>${S.product.autoNote?`<p class="note li-auto">✓ ${esc(S.product.autoNote)}</p>`:''}<p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다. 제품을 지우려면 「← 제품 목록」에서 지우세요.</p>`;
 }
 // 상품 코드로 구글 시트(플레르가구·가즈다가구 상품등록 현황)에서 찾은 결과를 화면에 띄우지 않고 제품에만 저장해 둔다
 // (S.product.sheet.matches[].channels = 네이버·쿠팡·오늘의집 등록 여부 → 나중에 플랫폼별 상품등록 완료 확인에 쓸 것). sheetBox()는 지금 안 씀
@@ -98,6 +98,22 @@ function sheetBox(){
   return `<div class="li-sheet"><div class="ls-head"><b>구글 시트 확인</b>${brands.map(b=>`<span class="tag ${b==='가즈다가구'?'amber':'blue'}">${esc(b)}</span>`).join('')}<span class="ls-name">${esc(names[0])}${names.length>1?` 외 ${names.length-1}개`:''}</span><span class="note">옵션 ${sh.total}개${sh.total>sh.matches.length?` 중 ${sh.matches.length}개 표시`:''} · ${sh.by}로 찾음 · ${esc(String(sh.at||'').slice(5,16).replace('T',' '))} 기준</span><button class="btn small" id="lnLookup">새로 확인</button></div>
     <div class="tw"><table class="ls-tbl"><thead><tr><th>옵션코드</th><th>사이즈</th><th>색상</th>${sh.matches[0].channels.map(c=>`<th class="num">${c.ch}</th>`).join('')}</tr></thead><tbody>${sh.matches.map(m=>`<tr><td>${esc(m.code)}</td><td>${esc(m.size)}</td><td>${esc(m.color)}</td>${m.channels.map(c=>`<td class="num">${c.on?`<span class="pill st-완료">등록</span> ${esc(c.price)}`:'<span class="note">미등록</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
 }
+// 시트에서 네이버·쿠팡·오늘의집 등록 여부가 모든 옵션 O면, 그 채널의 '상품등록' 업무를 완료로 바꾼다 (완료를 되돌리지는 않는다)
+const SHEET_CH = ['네이버','쿠팡','오늘의집'];
+const regTask = it => bare(it.name).includes('상품등록');
+function sheetPending(){ return S.checklists.some(c=>SHEET_CH.some(k=>c.name.includes(k)) && c.items.some(it=>regTask(it) && it.st!=='완료')); }
+function applySheet(){
+  const ms = S.product.sheet?.matches || [], done = [];
+  if(!ms.length) return done;
+  S.checklists.forEach(c=>{
+    const k = SHEET_CH.find(x=>c.name.includes(x)); if(!k) return;
+    if(!ms.every(m=>(m.channels.find(x=>x.ch===k)||{}).on)) return;
+    c.items.forEach(it=>{ if(it.st==='완료' || !regTask(it)) return;
+      setDone(it, true); it.memo = (it.memo ? it.memo+' · ' : '') + '시트 등록 확인으로 자동 완료';
+      done.push(c.name+' '+bare(it.name)); });
+  });
+  return done;
+}
 async function lookupCode(){
   const code = (S.product.code||'').trim(); if(!code) return;
   const pid = PID; lookingUp = true; lookErr = ''; render();
@@ -107,6 +123,8 @@ async function lookupCode(){
     if(pid !== PID) return;
     if(!r.ok) throw new Error(j.error || '구글 시트를 읽지 못했어요');
     S.product.sheet = { query: code, by: j.by, total: j.total, matches: j.matches, at: new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString() };
+    const auto = applySheet();
+    if(auto.length) S.product.autoNote = `구글 시트에 등록된 걸 확인해서 자동 완료했어요: ${auto.join(', ')} (${md(TODAY)})`;
     markDirty();
   }catch(e){ if(pid === PID) lookErr = e.message; }
   finally{ if(pid === PID){ lookingUp = false; render(); } }
@@ -698,6 +716,8 @@ async function openProduct(id){
   calMonth = null; expSel = 'all'; expEdit = ''; expMonth = null; expHide = {}; calHide = {}; CF = {}; openCol = null; editPeriod = -1; delPlat = -1; perfCp = 'W1'; resetArm = false;
   try{ await load(); }catch(_){ alert('이 제품을 불러오지 못했어요. 목록을 다시 볼게요.'); return showList(); }
   openSt = new Set(S.steps.map((_,i)=>i+1).filter(n=>n!==13 && stepStatus(n)==='지연'));
+  const shAt = Date.parse((S.product.sheet?.at||'').replace(/Z?$/,'Z')) + new Date().getTimezoneOffset()*6e4;
+  if(S.product.code && sheetPending() && !(Date.now() - shAt < 30*60e3)) setTimeout(lookupCode, 300);
   $('#lnList').classList.add('hidden'); $('#lnWelcome').classList.add('hidden'); $('#lnProduct').classList.remove('hidden');
   render(); window.scrollTo(0,0);
 }

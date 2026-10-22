@@ -391,3 +391,4 @@
 #launchView .ls-tbl{background:var(--card)}
 #launchView .ls-tbl td{white-space:nowrap}
 @media (max-width:900px){#launchView .li-form{grid-template-columns:1fr 1fr}}
+#launchView .li-auto{color:var(--green);font-weight:600}
