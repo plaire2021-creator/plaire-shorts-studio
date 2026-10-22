@@ -316,3 +316,43 @@
 #launchView .mgr,#launchView .gob,#launchView .lseg button,#launchView .xtag,#launchView .period{white-space:nowrap}
 #launchView td:first-child,#launchView .gl{white-space:nowrap}
 #launchView .xsum{min-width:1060px}#launchView .xsum td:nth-child(3),#launchView .xsum td:nth-child(4){white-space:nowrap}#launchView .xsum td:last-child{min-width:340px}
+/* 제품 정보 (맨 위) */
+#launchView .ln-info{padding:18px 22px}
+#launchView .li-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+#launchView .li-head h3{margin:0;font-size:16px}
+#launchView .li-head #lnSave{margin-left:auto}
+#launchView .ln-info .note{margin:8px 0 0}
+/* 대시보드: 14단계 */
+#launchView .ds-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+#launchView .ds-head h3{margin:0}
+#launchView .ds-head .bad{color:var(--red)}
+#launchView .ds-all{margin-left:auto;display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums}
+#launchView .ds-all .bar{width:160px}
+#launchView .ds-list{display:grid;gap:6px}
+#launchView .ds-row{border:1px solid var(--line);border-radius:12px;background:var(--card);overflow:hidden}
+#launchView .ds-row.s-지연{border-color:#f3c4c4}
+#launchView .ds-row.open{border-color:var(--line-2);box-shadow:var(--shadow)}
+#launchView .ds-top{display:grid;grid-template-columns:30px minmax(0,1.5fr) minmax(0,1.7fr) 120px 62px 14px;align-items:center;gap:14px;width:100%;border:0;background:none;padding:11px 14px;text-align:left;font:inherit;color:inherit;cursor:pointer}
+#launchView .ds-top:hover{background:var(--bg)}
+#launchView .ds-no{font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;color:var(--faint)}
+#launchView .s-완료 .ds-no{color:var(--green)}
+#launchView .s-진행중 .ds-no{color:var(--blue)}
+#launchView .s-지연 .ds-no{color:var(--red)}
+#launchView .ds-nm{font-weight:600;font-size:13.5px;min-width:0}
+#launchView .ds-nm small{display:block;font-weight:400;font-size:12px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#launchView .ds-chs{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+#launchView .ds-ch{font-size:11.5px;padding:2px 7px;border-radius:6px;background:var(--bg);color:var(--sub);white-space:nowrap}
+#launchView .ds-ch.on{background:var(--green-soft);color:var(--green)}
+#launchView .ds-ch.bad{background:var(--red-soft);color:var(--red)}
+#launchView .ds-ch em{font-style:normal;opacity:.75}
+#launchView .ds-prog{display:flex;align-items:center;gap:8px}
+#launchView .ds-prog .bar{flex:1}
+#launchView .ds-prog em{font-style:normal;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums;min-width:28px;text-align:right}
+#launchView .s-완료 .ds-prog .bar i{background:var(--green)}
+#launchView .s-지연 .ds-prog .bar i{background:var(--red)}
+#launchView .ds-top .pill{justify-self:start}
+#launchView .ds-caret{color:var(--faint);font-size:12px}
+#launchView .ds-body{padding:4px 18px 14px 58px;border-top:1px solid var(--line);background:#fbfcfd}
+#launchView .ds-body .td-row .pill{flex:none}
+#launchView .ds-foot{margin-top:10px}
+@media (max-width:900px){#launchView .ds-top{grid-template-columns:28px minmax(0,1fr) 90px 58px 12px}#launchView .ds-chs{display:none}#launchView .ds-body{padding-left:16px}#launchView .ds-all{margin-left:0}}

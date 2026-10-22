@@ -1,7 +1,7 @@
 (function(){
 // 팀장님 매뉴얼의 화면 코드를 옮기고, 저장만 서버(/api/launch)로 바꿨다 — 팀 모두가 같은 내용을 본다
 let S = null, PID = null, VER = 0, rev = 0, savedRev = 0, saving = false, saveErr = '', saveTimer = null;
-let ART = null, readOnly = false, dirty = false, tab = 'today', workMode = 'prog', goalMode = 'goal', OWN = '', calMonth = null, perfCp = 'W1', resetArm = false, delPlat = -1, editPeriod = -1;
+let ART = null, readOnly = false, dirty = false, tab = 'dash', openSt = new Set(), workMode = 'prog', goalMode = 'goal', OWN = '', calMonth = null, perfCp = 'W1', resetArm = false, delPlat = -1, editPeriod = -1;
 let calHide = {}, calColor = 'st';
 let expSel = 'all', expEdit = '', expMonth = null, expHide = {};
 let CF = {}, SORT = {key:'step', dir:1}, openCol = null, cfQ = '';
@@ -70,17 +70,18 @@ const periodTxt = t => kd(tStart(t))+(t.e!==t.s?' ~ '+kd(tEnd(t)):'');
 function markDirty(){ dirty = true; rev++; renderTop(); queueSave(); }
 function renderTop(){
   if(!S) return;
-  $('#lnProd').textContent = S.product.name;
   setCrumb(S.product.name);
-  $('#lnDday').textContent = dlabel(dnum(TODAY));
-  $('#lnLaunch').textContent = '출시 '+S.product.launch.replace(/-/g,'.')+' ('+wd(S.product.launch)+') · 오늘 '+md(TODAY);
-  const ex = $('#lnEx'); ex.classList.toggle('hidden', !S.product.memo); ex.title = S.product.memo || '';
-  // 출시 진행 막대: 1주 → 2주 → 3~4주 → 2개월, 오늘 위치에 선
-  const PH = [['1주 · 등록·콘텐츠',0,7],['2주 · 광고·리뷰',7,14],['3~4주 · 체험단·기획전',14,30],['2개월 · 성과 점검',30,61]], n = dnum(TODAY), pos = Math.max(0,Math.min(61,n+0.5))/61*100;
-  $('#lnPhase').innerHTML = `<div class="ph-bar">${PH.map(([l,a,b])=>`<i class="${n>=b?'past':n>=a?'now':''}" style="flex:${b-a}"></i>`).join('')}<em style="left:${pos}%" title="오늘"></em></div><div class="ph-lb">${PH.map(([l,a,b])=>`<span style="flex:${b-a}" class="${n>=a&&n<b?'now':''}">${l}</span>`).join('')}</div>`;
-  const m = $('#lnSave');
+  const m = $('#lnSave'); if(!m) return;
   m.textContent = saveErr || (saving ? '저장 중…' : dirty ? '저장 대기 중…' : '모두 저장됨');
   m.className = 'tag ' + (saveErr ? 'red' : (saving||dirty) ? 'amber' : 'green');
+}
+function renderInfo(){
+  $('#lnInfo').innerHTML = `<div class="li-head"><button class="mini" id="lnBack">← 제품 목록</button><h3>제품 정보</h3><span class="tag blue">${dlabel(dnum(TODAY))}</span>${S.product.memo?`<span class="tag amber" title="${esc(S.product.memo)}">예시</span>`:''}<span class="tag" id="lnSave"></span></div>
+  <div class="prodform">
+    <label>제품명<input id="pf-name" type="text" value="${esc(S.product.name)}"></label>
+    <label>출시일 (상품 등록일, D-day)<input id="pf-launch" type="date" value="${S.product.launch}"></label>
+    <label>카테고리<input id="pf-cat" type="text" value="${esc(S.product.category)}"></label>
+  </div><p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다. 제품을 지우려면 「← 제품 목록」에서 지우세요.</p>`;
 }
 
 /* ---------- 계산 ---------- */
@@ -115,54 +116,44 @@ const xMine = st => !OWN || (st.owner||'')===OWN;
 const dLeft = d => Math.round((parse(d)-parse(TODAY))/864e5);
 function expStepStatus(){ const all=S.exp.filter(xOn).flatMap(x=>x.steps.map(a=>({x,a})));
   if(!all.length) return '대기'; if(all.every(o=>o.a.st==='완료')) return '완료'; if(all.some(o=>xLate(o.x,o.a))) return '지연'; if(all.some(o=>o.a.st!=='대기')) return '진행중'; return '대기'; }
-function vToday(){
-  const T = TK().filter(mine), soon = addD(TODAY,7);
-  // 이번 주 할 일: 안 끝났고 7일 안에 시작하는 업무 + 체험단 단계 (마감 가까운 순)
-  const todo = [];
-  T.forEach(t=>{ if(t.st==='완료'||t.st==='보류'||isLate(t)||tStart(t)>soon) return;
-    todo.push({owner:t.owner||'미정', name:bare(t.name), sub:t.ch+(t.rec==='weekly'?' · 매주 월요일':''), end:tEnd(t), id:`ck-${t._ci}-${t._ii}`, attr:`data-ck="${t._ci}-${t._ii}"`, st:t.st}); });
-  S.exp.forEach((x,xi)=>{ if(!xOn(x)) return; x.steps.forEach((st,si)=>{ if(!xMine(st)||st.st==='완료'||st.st==='보류'||xLate(x,st)||xStart(x,st)>soon) return;
-    todo.push({owner:st.owner||'미정', name:st.name, sub:'체험단 · '+x.name, end:xEnd(x,st), id:`xk-${xi}-${si}`, attr:`data-xck="${xi}-${si}"`, st:st.st}); }); });
-  todo.sort((a,b)=>a.end.localeCompare(b.end));
-  const late = [];
-  T.filter(isLate).forEach(t=>late.push({name:bare(t.name), sub:t.ch+' · '+(t.owner||'담당 미정'), days:dnum(TODAY)-t.e, id:`ck-${t._ci}-${t._ii}`, attr:`data-ck="${t._ci}-${t._ii}"`}));
-  S.exp.forEach((x,xi)=>x.steps.forEach((st,si)=>{ if(xMine(st) && xLate(x,st)) late.push({name:st.name, sub:'체험단 · '+x.name+' · '+(st.owner||'담당 미정'), days:-dLeft(xEnd(x,st)), id:`xk-${xi}-${si}`, attr:`data-xck="${xi}-${si}"`}); }));
-  if(!OWN) S.exp.forEach(x=>x.people.forEach(p=>{ if(xOn(x) && pLate(p)) late.push({name:'게시 예정 · '+(p.name||'참여자'), sub:'체험단 · '+x.name+' 참여자 (체험단 탭에서 고쳐요)', days:-dLeft(p.plan)}); }));
-  late.sort((a,b)=>b.days-a.days);
-  const row = (t,lateDays) => `<label class="td-row"><input type="checkbox" ${t.id?`id="${t.id}"`:''} ${t.attr||'disabled'} aria-label="완료"><span class="td-t">${esc(t.name)}<small>${esc(t.sub)}</small></span><span class="td-d ${lateDays!=null?'bad':''}">${lateDays!=null?lateDays+'일 지남':(t.st==='진행중'?'진행중 · ':'')+'~'+md(t.end)}</span></label>`;
-  const by = {}; todo.forEach(t=>(by[t.owner]=by[t.owner]||[]).push(t));
-  const order = [...OWNERS,'미정'].filter(o=>by[o]).concat(Object.keys(by).filter(o=>!OWNERS.includes(o)&&o!=='미정'));
-  let h = `<div class="td-grid"><div class="panel"><h3>이번 주 할 일 <span class="note">${todo.length}건 · ${md(TODAY)}~${md(soon)}</span></h3>`;
-  h += todo.length ? order.map(o=>`<div class="td-own">${esc(o)} <span>${by[o].length}</span></div>${by[o].slice(0,6).map(t=>row(t)).join('')}${by[o].length>6?`<p class="note td-more">외 ${by[o].length-6}건 — 「업무」 탭에서 볼 수 있어요</p>`:''}`).join('')
-    : `<p class="note">이번 주에 할 일이 없어요.${OWN?' 담당을 「전체」로 바꿔 보세요.':''}</p>`;
-  h += `</div><div class="td-side">`;
-  h += `<div class="panel ${late.length?'td-late':'td-ok'}"><h3>${late.length?`늦어진 일 ${late.length}건`:'늦어진 일 없음'}</h3>${late.length?late.slice(0,8).map(t=>row(t,t.days)).join('')+(late.length>8?`<p class="note td-more">외 ${late.length-8}건</p>`:''):'<p class="note">마감이 지난 일이 없어요.</p>'}</div>`;
-  const cps = S.checkpoints.map(c=>({...c, date:addD(S.product.launch,c.d)}));
-  const next = cps.find(c=>c.date>=TODAY), miss = cps.filter(c=>c.date<TODAY && !hasPerf(c.key));
-  h += `<div class="panel"><h3>다음 성과 점검</h3>${next?`<p class="td-big">${next.name} · ${kd(next.date)} <span class="tag ${dLeft(next.date)<=3?'amber':''}">${dLeft(next.date)?dLeft(next.date)+'일 남음':'오늘'}</span></p>`:'<p class="note">모든 점검일이 지났어요.</p>'}
-    ${miss.length?`<p class="td-miss">${miss.map(c=>c.name).join('·')} 실적이 아직 비어 있어요</p>`:''}
-    <button class="btn small" data-goperf="${(miss[0]||next||cps[cps.length-1]).key}">실적 입력</button></div>`;
+function vDash(){
+  const T = TK(), done = T.filter(t=>t.st==='완료').length, late = T.filter(isLate).length;
+  const stepSt = n => n===13 ? expStepStatus() : stepStatus(n);
+  const doneSteps = S.steps.filter((_,i)=>stepSt(i+1)==='완료').length;
+  let h = `<div class="panel ds-main"><div class="ds-head"><h3>14단계 진행</h3><span class="note">완료 ${doneSteps} / 14단계 · 업무 ${done} / ${T.length}건${late?` · <b class="bad">지연 ${late}건</b>`:''} · 단계를 누르면 업무가 펼쳐져요</span><span class="ds-all"><span class="bar"><i style="width:${pct(done,T.length)}%"></i></span><b>${pct(done,T.length)}%</b></span></div><div class="ds-list">`;
+  S.steps.forEach((nm,i)=>{
+    const n = i+1, st = stepSt(n), open = openSt.has(n);
+    let d, tot, rng, chans, owners, body = '';
+    if(n===13){
+      const all = S.exp.filter(xOn).flatMap(x=>x.steps.map(a=>({x,a}))), r = expRange();
+      d = all.filter(o=>o.a.st==='완료').length; tot = all.length; rng = r ? md(r.a)+' ~ '+md(r.b) : '진행하는 체험단 없음';
+      chans = S.exp.map(x=>`<span class="ds-ch ${goOf(x)==='진행'?'on':''}">${esc(x.name)} <em>${goOf(x)}</em></span>`).join('');
+      owners = [...new Set(all.map(o=>o.a.owner).filter(Boolean))];
+      if(open) body = S.exp.map(x=>{ const xd=x.steps.filter(a=>a.st==='완료').length, po=x.people.filter(p=>p.st==='게시완료').length, lt=x.steps.some(a=>xLate(x,a));
+        return `<div class="td-row"><span class="td-t">${esc(x.name)}<small>${esc(x.ch)} · ${goOf(x)}</small></span><span class="td-d ${lt?'bad':''}">${xd}/${x.steps.length}단계 · 게시 ${po}/${x.target}건</span></div>`; }).join('')
+        + `<div class="ds-foot"><button class="btn small" data-goexp="all">체험단 탭에서 관리</button></div>`;
+    } else {
+      const ts = stepTasks(n), r = stepRange(n);
+      d = ts.filter(t=>t.st==='완료').length; tot = ts.length; rng = r ? md(addD(S.product.launch,r.s))+' ~ '+md(addD(S.product.launch,r.e)) : '업무 없음';
+      chans = ts.map(t=>`<span class="ds-ch ${t.st==='완료'?'on':isLate(t)?'bad':''}" title="${esc(bare(t.name))} · ${esc(t.owner||'담당 미정')}">${t.st==='완료'?'✓ ':''}${esc(t.ch)}</span>`).join('');
+      owners = [...new Set(ts.map(t=>t.owner).filter(Boolean))];
+      if(open) body = ts.map(t=>{ const lt = isLate(t), s2 = lt ? '지연' : t.st;
+        return `<label class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)} · ${esc(t.owner||'담당 미정')}${t.rec==='weekly'?' · 매주 월요일':''}</small></span><span class="td-d ${lt?'bad':''}">${lt?(dnum(TODAY)-t.e)+'일 지남':periodTxt(t)}</span><span class="pill st-${s2}">${s2}</span></label>`; }).join('')
+        + `<div class="ds-foot"><button class="btn small" data-gostep="${n}">업무 탭에서 담당·기간 바꾸기</button></div>`;
+    }
+    h += `<div class="ds-row s-${st} ${open?'open':''}"><button class="ds-top" data-dsopen="${n}" aria-expanded="${open}"><span class="ds-no">${stepNo(n)}</span><span class="ds-nm">${esc(nm)}<small>${rng}${owners.length?' · '+owners.map(esc).join(', '):''}</small></span><span class="ds-chs">${chans}</span><span class="ds-prog"><span class="bar"><i style="width:${pct(d,tot)}%"></i></span><em>${d}/${tot}</em></span><span class="pill st-${st}">${st}</span><span class="ds-caret" aria-hidden="true">${open?'▴':'▾'}</span></button>${open?`<div class="ds-body">${body}</div>`:''}</div>`;
+  });
   h += `</div></div>`;
   // 숫자 4칸
-  const done = T.filter(t=>t.st==='완료').length;
   const kpiLast = k => { for(const c of [...S.checkpoints].reverse()){ const v=(S.kpi[c.key]||{})[k]; if(v) return v; } return '-'; };
   const xs = S.exp.filter(xOn), posted = xs.reduce((s,x)=>s+x.people.filter(p=>p.st==='게시완료').length,0), tgt = xs.reduce((s,x)=>s+(+x.target||0),0);
   const lastCp = [...S.checkpoints].reverse().find(c=>hasPerf(c.key)), tot = chTotals();
   const sold = lastCp ? S.channels.reduce((s,c)=>s+(((S.perf[lastCp.key]||{})[c.name]||{}).qty||0),0) : null;
   h += `<div class="tiles ln-t4">
-    <div class="tile"><div class="k">업무 진행${OWN?' · '+esc(OWN):''}</div><div class="v">${pct(done,T.length)}%</div><div class="s">완료 ${done} / ${T.length}건</div></div>
+    <div class="tile"><div class="k">업무 진행</div><div class="v">${pct(done,T.length)}%</div><div class="s">완료 ${done} / ${T.length}건</div></div>
     <div class="tile"><div class="k">누적 리뷰</div><div class="v">${esc(kpiLast('누적 리뷰 수'))}</div><div class="s">목표 ${esc(S.kpiGoal['누적 리뷰 수']||'-')}</div></div>
     <div class="tile"><div class="k">체험단 게시</div><div class="v">${posted}건</div><div class="s">목표 ${tgt}건 (진행·검토중)</div></div>
     <div class="tile"><div class="k">판매</div><div class="v">${sold==null?'-':sold+'대'}</div><div class="s">1개월 목표 ${tot.qty}대${lastCp?' · '+lastCp.name+' 기준':''}</div></div></div>`;
-  // 14단계 한눈에
-  h += `<div class="panel"><h3>14단계 진행 <span class="note">누르면 그 단계 업무만 봐요</span></h3><div class="stps">${S.steps.map((nm,i)=>{ const n=i+1, st = n===13 ? expStepStatus() : stepStatus(n);
-      return `<button class="stp s-${st}" data-gostep="${n}" title="${stepNo(n)} ${esc(nm)} · ${st}"><b>${stepNo(n)} <em>${st}</em></b><span>${esc(nm)}</span></button>`; }).join('')}</div>
-    <div class="legend"><span><span class="sw" style="background:var(--green-soft);border:1px solid var(--green)"></span>완료</span><span><span class="sw" style="background:var(--blue-soft);border:1px solid var(--blue)"></span>진행중</span><span><span class="sw" style="background:var(--red-soft);border:1px solid var(--red)"></span>지연</span><span><span class="sw" style="background:var(--bg);border:1px solid var(--line-2)"></span>대기</span><span>14단계 진행률은 전체 팀 기준이에요</span></div></div>`;
-  h += `<div class="panel"><h3>제품 정보</h3><div class="prodform">
-    <label>제품명<input id="pf-name" type="text" value="${esc(S.product.name)}"></label>
-    <label>출시일 (상품 등록일, D-day)<input id="pf-launch" type="date" value="${S.product.launch}"></label>
-    <label>카테고리<input id="pf-cat" type="text" value="${esc(S.product.category)}"></label>
-  </div><p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다. 제품을 지우려면 「← 제품 목록」에서 지우세요.</p></div>`;
   return h;
 }
 // 업무 = 진행현황표 + 채널별 체크리스트 + 업무 순서 (같은 업무를 보는 세 가지 방법)
@@ -473,18 +464,18 @@ function vCal(){
 }
 
 /* ---------- 렌더·이벤트 ---------- */
-const TABS = [['today','오늘',vToday],['work','업무',vWork],['sched','일정',vCal],['exp','체험단',vExp],['gp','목표·성과',vGP]];
+const TABS = [['dash','대시보드',vDash],['work','업무',vWork],['sched','일정',vCal],['exp','체험단',vExp],['gp','목표·성과',vGP]];
 function shell(){
   ROOT.innerHTML = `<div class="welcome" id="lnWelcome"><h1>신제품 출시 매뉴얼</h1><p>제품마다 상품을 등록한 날(D-day)부터 채널별 할 일·체험단·판매 목표·성과를 한곳에서 챙겨요. 고친 내용은 자동으로 저장되고 팀 모두에게 똑같이 보여요.</p></div>
   <div id="lnList" class="ln-stack"></div>
   <div id="lnProduct" class="ln-stack hidden">
-  <section class="card ln-head"><div class="lh-top"><button class="mini" id="lnBack">← 제품 목록</button><b id="lnProd"></b><span class="tag amber hidden" id="lnEx">예시</span><span class="muted" id="lnLaunch"></span><span class="lh-right"><span class="tag" id="lnSave"></span><span class="lh-dday" id="lnDday"></span></span></div>
-  <div id="lnPhase"></div></section>
+  <section class="card ln-info" id="lnInfo"></section>
   <div class="seg ln-tabs" role="tablist">${TABS.map(([k,l])=>`<button role="tab" data-tab="${k}" class="${k===tab?'on':''}">${l}</button>`).join('')}</div>
   <section id="lnView" class="ln-stack"></section></div>`;
 }
 function render(focusId){
   ROOT.querySelectorAll('.ln-tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
+  renderInfo();
   $('#lnView').innerHTML = TABS.find(x=>x[0]===tab)[2]();
   renderTop();
   if(tab==='work' && workMode==='prog') renderDrop();
@@ -501,6 +492,7 @@ document.addEventListener('click', e=>{
   if(b.id==='lnBack'){ backToList(); return; }
   if(b.dataset.wmode){ workMode=b.dataset.wmode; editPeriod=-1; openCol=null; render(); return; }
   if(b.dataset.gmode){ goalMode=b.dataset.gmode; render(); return; }
+  if(b.dataset.dsopen){ const n=+b.dataset.dsopen; openSt.has(n)?openSt.delete(n):openSt.add(n); render(); return; }
   if(b.dataset.goperf){ tab='gp'; goalMode='perf'; perfCp=b.dataset.goperf; render(); window.scrollTo(0,0); return; }
   if(b.dataset.gostep){ const n=+b.dataset.gostep; if(n===13){ tab='exp'; expSel='all'; } else { tab='work'; workMode='prog'; CF={step:[stepNo(n)+' '+stepName(n)]}; } render(); return; }
   if(b.id==='lnAdd'){ addProduct(); return; }
@@ -677,6 +669,7 @@ async function openProduct(id){
   PID = id; S = null; VER = 0; rev = savedRev = 0; dirty = false; saveErr = '';
   calMonth = null; expSel = 'all'; expEdit = ''; expMonth = null; expHide = {}; calHide = {}; CF = {}; openCol = null; editPeriod = -1; delPlat = -1; perfCp = 'W1'; resetArm = false;
   try{ await load(); }catch(_){ alert('이 제품을 불러오지 못했어요. 목록을 다시 볼게요.'); return showList(); }
+  openSt = new Set(S.steps.map((_,i)=>i+1).filter(n=>n!==13 && stepStatus(n)==='지연'));
   $('#lnList').classList.add('hidden'); $('#lnWelcome').classList.add('hidden'); $('#lnProduct').classList.remove('hidden');
   render(); window.scrollTo(0,0);
 }
