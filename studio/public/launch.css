@@ -526,3 +526,6 @@
 #launchView .xd-where{width:180px}
 #launchView .xd-p input.xd-in:first-of-type{width:170px}
 #launchView .xd-dl{white-space:nowrap;margin-right:-4px;flex:none}
+#launchView .reg.ing{background:var(--blue-soft);border-color:#c9d6fb;color:var(--blue)}
+#launchView .reg em{font-style:normal;font-weight:500;font-size:12px;opacity:.85}
+#launchView .ds-ch.ing{background:var(--blue-soft);color:var(--blue)}
