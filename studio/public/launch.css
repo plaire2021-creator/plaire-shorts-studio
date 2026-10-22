@@ -392,3 +392,11 @@
 #launchView .ls-tbl td{white-space:nowrap}
 @media (max-width:900px){#launchView .li-form{grid-template-columns:1fr 1fr}}
 #launchView .li-auto{color:var(--green);font-weight:600}
+/* 시트가 정하는 상품등록: 스토어 이름만 가로로 */
+#launchView .reg-list{display:flex;flex-wrap:wrap;gap:8px;padding:10px 0 4px}
+#launchView .reg{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;background:var(--card);border:1px solid var(--line-2);font-size:13px;font-weight:600;color:var(--faint)}
+#launchView .reg.on{background:var(--green-soft);border-color:#bfe5cd;color:var(--green)}
+#launchView .reg-note{margin:8px 0 0;font-size:11.5px;color:var(--faint)}
+#launchView .linkbtn{border:0;background:none;padding:0;font:inherit;color:var(--blue);cursor:pointer;text-decoration:underline}
+#launchView .ckrow input[type=checkbox]:disabled{cursor:not-allowed;opacity:.85}
+#launchView td select:disabled{opacity:.8;cursor:not-allowed}

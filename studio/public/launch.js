@@ -85,7 +85,7 @@ function renderInfo(){
     <label>제품명<input id="pf-name" type="text" value="${esc(S.product.name)}"></label>
     <label>출시일 (상품 등록일, D-day)<input id="pf-launch" type="date" value="${S.product.launch}"></label>
     <label>카테고리<input id="pf-cat" type="text" value="${esc(S.product.category)}"></label>
-  </div>${S.product.autoNote?`<p class="note li-auto">✓ ${esc(S.product.autoNote)}</p>`:''}<p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다. 제품을 지우려면 「← 제품 목록」에서 지우세요.</p>`;
+  </div><p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다. 제품을 지우려면 「← 제품 목록」에서 지우세요.</p>`;
 }
 // 상품 코드로 구글 시트(플레르가구·가즈다가구 상품등록 현황)에서 찾은 결과를 화면에 띄우지 않고 제품에만 저장해 둔다
 // (S.product.sheet.matches[].channels = 네이버·쿠팡·오늘의집 등록 여부 → 나중에 플랫폼별 상품등록 완료 확인에 쓸 것). sheetBox()는 지금 안 씀
@@ -102,21 +102,22 @@ function sheetBox(){
     <div class="tw"><table class="ls-tbl"><thead><tr><th>옵션코드</th><th>사이즈</th><th>색상</th>${sh.matches[0].channels.map(c=>`<th class="num">${c.ch}</th>`).join('')}</tr></thead><tbody>${sh.matches.map(m=>`<tr><td>${esc(m.code)}</td><td>${esc(m.size)}</td><td>${esc(m.color)}</td>${m.channels.map(c=>`<td class="num">${c.on?`<span class="pill st-완료">등록</span> ${esc(c.price)}`:'<span class="note">미등록</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
 }
 // 시트에서 네이버·쿠팡·오늘의집 등록 여부가 모든 옵션 O면, 그 채널의 '상품등록' 업무를 완료로 바꾼다 (완료를 되돌리지는 않는다)
-// 업무 이름(없으면 채널 이름)으로 어느 플랫폼 등록인지 정한다
-const SHEET_CH = [['스마트스토어','네이버'],['네이버','네이버'],['쿠팡','쿠팡'],['오늘의집','오늘의집'],['11번가','11번가'],['ESM','ESM'],['롯데온','롯데온']];
+// 상품등록 업무는 사람이 체크하지 않는다 — 구글 시트(상품등록 현황)의 등록 여부(O)를 그대로 따라간다
+// 업무 이름(없으면 채널 이름)으로 어느 스토어인지 정한다
+const SHEET_CH = [['스마트스토어','네이버'],['네이버','네이버'],['쿠팡','쿠팡'],['오늘의집','오늘의집'],['11번가','11번가'],['ESM','ESM'],['롯데온','롯데온'],['한샘몰','한샘몰']];
 const regTask = it => (S.steps[it.step-1]||'').includes('상품등록') || bare(it.name).includes('상품등록');
-const sheetCh = (it,c) => { const nm = bare(it.name), f = SHEET_CH.find(([k])=>nm.includes(k)) || SHEET_CH.find(([k])=>c.name.includes(k)); return f && f[1]; };
-const autoUndone = it => it.st!=='완료' && /자동 완료/.test(it.memo||''); // 자동 완료됐다가 사람이 되돌린 업무 → 다시 건드리지 않는다
-function sheetPending(){ return S.checklists.some(c=>c.items.some(it=>regTask(it) && it.st!=='완료' && !autoUndone(it) && sheetCh(it,c))); }
+const sheetChOf = (it, chName) => { const nm = bare(it.name), f = SHEET_CH.find(([k])=>nm.includes(k)) || SHEET_CH.find(([k])=>String(chName||'').includes(k)); return f && f[1]; };
+const sheetCh = (it,c) => sheetChOf(it, c.name);
+const bySheet = (it, chName) => regTask(it) && !!sheetChOf(it, chName ?? it.ch); // 시트가 정하는 업무인지
+function sheetPending(){ return S.checklists.some(c=>c.items.some(it=>it.st!=='완료' && bySheet(it, c.name))); }
 function applySheet(){
   const ms = S.product.sheet?.matches || [], done = [];
   if(!ms.length) return done;
   S.checklists.forEach(c=>c.items.forEach(it=>{
-    if(it.st==='완료' || !regTask(it) || autoUndone(it)) return;
-    const k = sheetCh(it,c); if(!k) return;
-    if(!ms.every(m=>(m.channels.find(x=>x.ch===k)||{}).on)) return;
-    setDone(it, true); it.memo = (it.memo ? it.memo+' · ' : '') + '시트 등록 확인으로 자동 완료';
-    done.push(bare(it.name).includes(k)||bare(it.name).includes('스마트스토어') ? bare(it.name) : c.name+' '+bare(it.name));
+    const k = bySheet(it, c.name) && sheetCh(it,c); if(!k) return;
+    const on = ms.every(m=>(m.channels.find(x=>x.ch===k)||{}).on);
+    if(on && it.st!=='완료'){ setDone(it, true); done.push(bare(it.name)); }
+    else if(!on && it.st==='완료'){ it.st = '대기'; } // 시트에서 O가 빠지면 체크도 풀린다
   }));
   return done;
 }
@@ -130,7 +131,6 @@ async function lookupCode(){
     if(!r.ok) throw new Error(j.error || '구글 시트를 읽지 못했어요');
     S.product.sheet = { query: code, by: j.by, total: j.total, matches: j.matches, at: new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString() };
     const auto = applySheet();
-    if(auto.length) S.product.autoNote = `구글 시트에 등록된 걸 확인해서 자동 완료했어요: ${auto.join(', ')} (${md(TODAY)})`;
     markDirty();
   }catch(e){ if(pid === PID) lookErr = e.message; }
   finally{ if(pid === PID){ lookingUp = false; render(); } }
@@ -197,7 +197,12 @@ function vDash(){
       d = ts.filter(t=>t.st==='완료').length; tot = ts.length; rng = r ? md(addD(S.product.launch,r.s))+' ~ '+md(addD(S.product.launch,r.e)) : '업무 없음';
       chans = ts.map(t=>`<span class="ds-ch ${t.st==='완료'?'on':isLate(t)?'bad':''}" title="${esc(t.ch)} · ${esc(t.owner||'담당 미정')}">${t.st==='완료'?'✓ ':''}${esc(bare(t.name))}</span>`).join('');
       owners = [...new Set(ts.map(t=>t.owner).filter(Boolean))];
-      if(open) body = ts.map(t=>{ const lt = isLate(t), s2 = lt ? '지연' : t.st;
+      const sheetOnly = ts.length && ts.every(t=>bySheet(t));
+      if(open && sheetOnly){
+        const sh = S.product.sheet, at = sh?.at ? `마지막 확인 ${String(sh.at).slice(5,10).replace('-','/')} ${String(sh.at).slice(11,16)}` : '';
+        body = `<div class="reg-list">${ts.map(t=>`<span class="reg ${t.st==='완료'?'on':''}">${t.st==='완료'?'✓':'○'} ${esc(bare(t.name).replace(/\s*상품등록$/,''))}</span>`).join('')}</div>
+          <p class="reg-note">${S.product.code ? `구글 시트 「상품등록 현황」에 등록(O)하면 자동으로 체크돼요.${at?' · '+at:''} <button class="linkbtn" id="lnLookup">지금 확인</button>` : '제품 정보에 상품 코드를 넣으면 구글 시트 「상품등록 현황」을 보고 자동으로 체크돼요.'}</p>`;
+      } else if(open) body = ts.map(t=>{ const lt = isLate(t), s2 = lt ? '지연' : t.st;
         return `<label class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)} · ${esc(t.owner||'담당 미정')}${t.rec==='weekly'?' · 매주 월요일':''}</small></span><span class="td-d ${lt?'bad':''}">${lt?(dnum(TODAY)-t.e)+'일 지남':periodTxt(t)}</span><span class="pill st-${s2}">${s2}</span></label>`; }).join('')
         + `<div class="ds-foot"><button class="btn small" data-gostep="${n}">업무 탭에서 담당·기간 바꾸기</button></div>`;
     }
@@ -231,7 +236,7 @@ function vCheck(){
   let h = `<h2>채널별 체크리스트</h2><p class="lead">여기 항목이 그대로 「진행현황표」 업무가 됩니다. 체크하면 진행현황 상태가 '완료'로, 진행현황에서 완료로 바꾸면 여기도 체크됩니다. 항목 앞의 [번호]는 업무 순서 번호입니다. 순서는 항목을 마우스로 끌어 놓아 바꿉니다.</p><div class="grid g3">`;
   S.checklists.forEach((c,ci)=>{ const d=c.items.filter(i=>i.st==='완료').length;
     h += `<div class="ck" data-card="${ci}"><div class="hd"><input type="text" id="pn-${ci}" data-pname="${ci}" value="${esc(c.name)}" aria-label="플랫폼 이름"><span>${d}/${c.items.length}</span></div><div class="bar" style="margin-bottom:8px"><i style="width:${pct(d,c.items.length)}%"></i></div>`;
-    c.items.forEach((it,ii)=>{ if(!mine(it)) return; h += `<div class="ckrow ${it.st==='완료'?'on':''}" draggable="true" data-drag="${ci}-${ii}"><span class="grip" title="끌어서 순서 변경" aria-hidden="true">⠿</span><input type="checkbox" id="ck-${ci}-${ii}" data-ck="${ci}-${ii}" ${it.st==='완료'?'checked':''} aria-label="완료"><input type="text" id="ct-${ci}-${ii}" data-ct="${ci}-${ii}" value="${esc(it.name)}" aria-label="항목 내용" draggable="false">${it.st!=='완료'&&it.st!=='대기'?`<span class="pill st-${isLate(it)?'지연':it.st}" style="flex:none;font-size:11px">${isLate(it)?'지연':it.st}</span>`:(isLate(it)?'<span class="pill st-지연" style="flex:none;font-size:11px">지연</span>':'')}<button class="btn ghost" data-delit="${ci}-${ii}" aria-label="항목 삭제">✕</button></div>`; });
+    c.items.forEach((it,ii)=>{ if(!mine(it)) return; h += `<div class="ckrow ${it.st==='완료'?'on':''}" draggable="true" data-drag="${ci}-${ii}"><span class="grip" title="끌어서 순서 변경" aria-hidden="true">⠿</span><input type="checkbox" id="ck-${ci}-${ii}" data-ck="${ci}-${ii}" ${it.st==='완료'?'checked':''} ${bySheet(it,c.name)?'disabled title="구글 시트에 등록하면 자동으로 체크돼요"':''} aria-label="완료"><input type="text" id="ct-${ci}-${ii}" data-ct="${ci}-${ii}" value="${esc(it.name)}" aria-label="항목 내용" draggable="false">${it.st!=='완료'&&it.st!=='대기'?`<span class="pill st-${isLate(it)?'지연':it.st}" style="flex:none;font-size:11px">${isLate(it)?'지연':it.st}</span>`:(isLate(it)?'<span class="pill st-지연" style="flex:none;font-size:11px">지연</span>':'')}<button class="btn ghost" data-delit="${ci}-${ii}" aria-label="항목 삭제">✕</button></div>`; });
     h += `<div class="ckadd"><input type="text" id="na-${ci}" data-newit="${ci}" placeholder="+ 새 항목 입력 후 Enter"><button class="btn small" data-addit="${ci}">추가</button></div>
       <div class="ckfoot">${delPlat===ci?`<button class="btn small danger" data-delplat="${ci}">정말 삭제 (항목 ${c.items.length}개 포함)</button> <button class="btn small" id="delPlatCancel">취소</button>`:`<button class="btn small ghost" data-delplat="${ci}">플랫폼 삭제</button>`}</div></div>`; });
   h += `<div class="ck" style="display:flex;flex-direction:column;justify-content:center;gap:8px"><b>플랫폼 추가</b><div class="ckadd" style="margin:0"><input type="text" id="newPlat" placeholder="예: 카카오 선물하기"><button class="btn small" id="addPlat">추가</button></div></div>`;
@@ -414,7 +419,7 @@ function vProg(){
       <td style="min-width:96px">${ownerSel(`tk-${i}-owner`, `data-tk="${i}" data-f="owner"`, t.owner)}</td>
       <td>${editPeriod===i?`<div class="pedit"><input type="date" id="tk-${i}-ds" data-tkd="${i}" data-f="s" value="${tStart(t)}" aria-label="시작일"><input type="date" id="tk-${i}-de" data-tkd="${i}" data-f="e" value="${tEnd(t)}" aria-label="마감일"><button class="btn small" id="periodDone">확인</button></div>`
         :`<button class="period" data-period="${i}" title="눌러서 날짜 변경">${periodTxt(t)}</button>${t.rec==='weekly'?'<div class="note">매주 월요일</div>':''}`}</td>
-      <td style="min-width:96px"><select id="tk-${i}-st" data-tk="${i}" data-f="st" class="s-${t.st}">${STS.map(s=>`<option ${s===t.st?'selected':''}>${s}</option>`).join('')}</select></td>
+      <td style="min-width:96px"><select id="tk-${i}-st" data-tk="${i}" data-f="st" class="s-${t.st}" ${bySheet(t)?'disabled title="구글 시트에 등록하면 자동으로 바뀌어요"':''}>${STS.map(s=>`<option ${s===t.st?'selected':''}>${s}</option>`).join('')}</select></td>
       <td style="min-width:150px"><input type="text" id="tk-${i}-memo" data-tk="${i}" data-f="memo" value="${esc(t.memo||'')}"></td>
       <td><button class="btn small ghost" data-deltk="${i}" aria-label="업무 삭제">✕</button></td></tr>`; });
   if(!rows.length) h += `<tr><td colspan="8" class="empty">조건에 맞는 업무가 없습니다. 머리글 필터를 풀어 보세요.</td></tr>`;
@@ -628,6 +633,7 @@ document.addEventListener('change', e=>{
   if(ds.xp){ const [xi,si]=ds.xp.split('-').map(Number); S.exp[xi].steps[si][ds.f]=el.value; markDirty(); if(ds.f==='st') render(); else renderTop(); return; }
   if(ds.xq){ const [xi,pi]=ds.xq.split('-').map(Number), p=S.exp[xi].people[pi]; p[ds.f]=el.value; if(ds.f==='posted'&&el.value&&p.st!=='취소') p.st='게시완료'; markDirty(); if(['st','plan','posted'].includes(ds.f)) render(); else renderTop(); return; }
   if(ds.xck){ const [xi,si]=ds.xck.split('-').map(Number); S.exp[xi].steps[si].st = el.checked?'완료':'대기'; markDirty(); render(); return; }
+  if(ds.ck){ const [c0,i0]=ds.ck.split('-').map(Number); if(bySheet(S.checklists[c0].items[i0], S.checklists[c0].name)){ render(); return; } }
   if(ds.ck){ const [ci,ii]=ds.ck.split('-').map(Number); setDone(S.checklists[ci].items[ii], el.checked); markDirty(); render(); return; }
   if(ds.ct){ const [ci,ii]=ds.ct.split('-').map(Number); const v=el.value.trim(); if(v){ const it=S.checklists[ci].items[ii]; it.name=v; const n=stepOfName(v); if(n) it.step=n; } else S.checklists[ci].items.splice(ii,1); markDirty(); render(); return; }
   if(ds.pname!=null){ const v=el.value.trim(); if(v){ S.checklists[+ds.pname].name=v; markDirty(); } render(); return; }

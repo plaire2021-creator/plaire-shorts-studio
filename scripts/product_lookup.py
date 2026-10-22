@@ -18,7 +18,7 @@ SHEETS = [
     ("플레르가구", "1JkatjKPw2wz6spB0Hxhu64wbE8f1YircK84WhGyXPzo", "플레르가구 상품등록"),
     ("가즈다가구", "1Ede_NyJMfKAaKU1oLfnTq7rU_0edhWYFiQQiaCo3FZo", "가즈다가구 상품등록"),
 ]
-CACHE = os.path.join(tempfile.gettempdir(), "plaire_product_sheets_v2.json")  # 열을 늘리면 이름을 바꿔 옛 캐시를 안 쓰게
+CACHE = os.path.join(tempfile.gettempdir(), "plaire_product_sheets_v3.json")  # 열을 늘리면 이름을 바꿔 옛 캐시를 안 쓰게
 TTL = 600
 
 
@@ -33,12 +33,21 @@ def rows():
 
     out = []
     for brand, key, tab in SHEETS:
-        ws = open_sheet("https://docs.google.com/spreadsheets/d/" + key).worksheet(tab)
+        sh = open_sheet("https://docs.google.com/spreadsheets/d/" + key)
+        ws = sh.worksheet(tab)
+        # 한샘몰은 첫 탭에 등록 열이 없다 → '한샘몰' 탭(A 옵션코드 · B 한샘몰링크)에 링크가 있으면 등록
+        hanssem = set()
+        try:
+            for h in sh.worksheet("한샘몰").get_values("A3:B5000"):
+                if len(h) > 1 and h[0].strip() and h[1].strip().startswith("http"):
+                    hanssem.add(h[0].strip())
+        except Exception:
+            pass
         # A 옵션코드 · B 상품명 · C 사이즈 · D 색상 · 그다음 채널마다 (등록 여부, 판매가): 네이버 쿠팡 오늘의집 11번가 ESM 토스 롯데온 하이마트
         for r in ws.get_values("A3:T5000"):
             r = (r + [""] * 20)[:20]
             if r[0].strip():
-                out.append([brand] + [c.strip() for c in r])
+                out.append([brand] + [c.strip() for c in r] + ["O" if r[0].strip() in hanssem else "", ""])
     json.dump({"at": time.time(), "rows": out}, open(CACHE, "w", encoding="utf-8"), ensure_ascii=False)
     return out
 
@@ -67,7 +76,7 @@ def main():
             "brand": r[0], "code": r[1], "name": r[2], "size": r[3], "color": r[4],
             "channels": [
                 {"ch": ch, "on": r[i].upper() == "O", "price": price(r[i + 1])}
-                for ch, i in (("네이버", 5), ("쿠팡", 7), ("오늘의집", 9), ("11번가", 11), ("ESM", 13), ("토스", 15), ("롯데온", 17), ("하이마트", 19))
+                for ch, i in (("네이버", 5), ("쿠팡", 7), ("오늘의집", 9), ("11번가", 11), ("ESM", 13), ("토스", 15), ("롯데온", 17), ("하이마트", 19), ("한샘몰", 21))
             ],
         }
         for r in hit[:30]
