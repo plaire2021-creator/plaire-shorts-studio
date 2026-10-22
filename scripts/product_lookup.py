@@ -18,7 +18,7 @@ SHEETS = [
     ("플레르가구", "1JkatjKPw2wz6spB0Hxhu64wbE8f1YircK84WhGyXPzo", "플레르가구 상품등록"),
     ("가즈다가구", "1Ede_NyJMfKAaKU1oLfnTq7rU_0edhWYFiQQiaCo3FZo", "가즈다가구 상품등록"),
 ]
-CACHE = os.path.join(tempfile.gettempdir(), "plaire_product_sheets.json")
+CACHE = os.path.join(tempfile.gettempdir(), "plaire_product_sheets_v2.json")  # 열을 늘리면 이름을 바꿔 옛 캐시를 안 쓰게
 TTL = 600
 
 
@@ -34,9 +34,9 @@ def rows():
     out = []
     for brand, key, tab in SHEETS:
         ws = open_sheet("https://docs.google.com/spreadsheets/d/" + key).worksheet(tab)
-        # A 옵션코드 · B 상품명 · C 사이즈 · D 색상 · E/F 네이버 등록·판매가 · G/H 쿠팡 · I/J 오늘의집
-        for r in ws.get_values("A3:J5000"):
-            r = (r + [""] * 10)[:10]
+        # A 옵션코드 · B 상품명 · C 사이즈 · D 색상 · 그다음 채널마다 (등록 여부, 판매가): 네이버 쿠팡 오늘의집 11번가 ESM 토스 롯데온 하이마트
+        for r in ws.get_values("A3:T5000"):
+            r = (r + [""] * 20)[:20]
             if r[0].strip():
                 out.append([brand] + [c.strip() for c in r])
     json.dump({"at": time.time(), "rows": out}, open(CACHE, "w", encoding="utf-8"), ensure_ascii=False)
@@ -67,7 +67,7 @@ def main():
             "brand": r[0], "code": r[1], "name": r[2], "size": r[3], "color": r[4],
             "channels": [
                 {"ch": ch, "on": r[i].upper() == "O", "price": price(r[i + 1])}
-                for ch, i in (("네이버", 5), ("쿠팡", 7), ("오늘의집", 9))
+                for ch, i in (("네이버", 5), ("쿠팡", 7), ("오늘의집", 9), ("11번가", 11), ("ESM", 13), ("토스", 15), ("롯데온", 17), ("하이마트", 19))
             ],
         }
         for r in hit[:30]

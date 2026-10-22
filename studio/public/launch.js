@@ -42,14 +42,17 @@ const bare = n => String(n||'').replace(/^\s*\[\d+\]\s*/,'');
 const stepOfName = n => { const m=String(n||'').match(/^\s*\[(\d+)\]/); return m?+m[1]:0; };
 const withStep = (n,st) => st ? '['+stepNo(st)+'] '+bare(n) : bare(n);
 function newItem(name, step){ step = step || stepOfName(name); const r=stepRange(step)||{s:0,e:30};
-  return {name: withStep(name, step), step, owner:S.product.team, s:r.s, e:r.e, st:'대기', memo:'', rec: step===12?'weekly':null}; }
+  return {name: withStep(name, step), step, owner:S.product.team, s:r.s, e:r.e, st:'대기', memo:'', rec: weeklyStep(step)?'weekly':null}; }
 function setDone(it, on){ if(on){ if(it.st!=='완료') defp(it,'_prev',it.st); it.st='완료'; } else if(it.st==='완료'){ it.st=(it._prev&&it._prev!=='완료')?it._prev:'대기'; } }
 // 예전 형식(항목 t/done + 별도 tasks) 저장본을 열었을 때
 function migrate(){ S.checklists.forEach(c=>c.items.forEach(it=>{ if(it.name==null){ it.name=it.t; delete it.t; }
   if(it.step==null) it.step=stepOfName(it.name); if(!it.st) it.st=it.done?'완료':'대기'; delete it.done;
-  if(it.s==null){ it.s=0; it.e=30; } if(it.owner==null) it.owner=S.product.team; if(it.memo==null) it.memo=''; if(it.rec===undefined) it.rec=it.step===12?'weekly':null; }));
+  if(it.s==null){ it.s=0; it.e=30; } if(it.owner==null) it.owner=S.product.team; if(it.memo==null) it.memo=''; if(it.rec===undefined) it.rec=weeklyStep(it.step)?'weekly':null; }));
   delete S.tasks; }
 const stepTasks = n => TK().filter(t=>t.step===n);
+// 단계 번호를 박아 두지 않는다: 이름에 '체험단'이 든 단계 = 체험단 탭에서 관리, '체크'가 든 단계 = 매주 월요일 반복
+const EXPN = () => S.steps.findIndex(n=>n.includes('체험단'))+1 || -1;
+const weeklyStep = n => /체크/.test(S.steps[n-1]||'');
 function stepRange(n){ const ts=stepTasks(n); if(!ts.length) return null; return {s:Math.min(...ts.map(t=>t.s)), e:Math.max(...ts.map(t=>t.e))}; }
 function stepStatus(n){ const ts=stepTasks(n); if(!ts.length) return '대기';
   if(ts.every(t=>t.st==='완료')) return '완료'; if(ts.some(isLate)) return '지연'; if(ts.some(t=>t.st==='진행중'||t.st==='완료')) return '진행중'; if(ts.every(t=>t.st==='보류')) return '보류'; return '대기'; }
@@ -99,19 +102,22 @@ function sheetBox(){
     <div class="tw"><table class="ls-tbl"><thead><tr><th>옵션코드</th><th>사이즈</th><th>색상</th>${sh.matches[0].channels.map(c=>`<th class="num">${c.ch}</th>`).join('')}</tr></thead><tbody>${sh.matches.map(m=>`<tr><td>${esc(m.code)}</td><td>${esc(m.size)}</td><td>${esc(m.color)}</td>${m.channels.map(c=>`<td class="num">${c.on?`<span class="pill st-완료">등록</span> ${esc(c.price)}`:'<span class="note">미등록</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
 }
 // 시트에서 네이버·쿠팡·오늘의집 등록 여부가 모든 옵션 O면, 그 채널의 '상품등록' 업무를 완료로 바꾼다 (완료를 되돌리지는 않는다)
-const SHEET_CH = ['네이버','쿠팡','오늘의집'];
-const regTask = it => bare(it.name).includes('상품등록');
-function sheetPending(){ return S.checklists.some(c=>SHEET_CH.some(k=>c.name.includes(k)) && c.items.some(it=>regTask(it) && it.st!=='완료')); }
+// 업무 이름(없으면 채널 이름)으로 어느 플랫폼 등록인지 정한다
+const SHEET_CH = [['스마트스토어','네이버'],['네이버','네이버'],['쿠팡','쿠팡'],['오늘의집','오늘의집'],['11번가','11번가'],['ESM','ESM'],['롯데온','롯데온']];
+const regTask = it => (S.steps[it.step-1]||'').includes('상품등록') || bare(it.name).includes('상품등록');
+const sheetCh = (it,c) => { const nm = bare(it.name), f = SHEET_CH.find(([k])=>nm.includes(k)) || SHEET_CH.find(([k])=>c.name.includes(k)); return f && f[1]; };
+const autoUndone = it => it.st!=='완료' && /자동 완료/.test(it.memo||''); // 자동 완료됐다가 사람이 되돌린 업무 → 다시 건드리지 않는다
+function sheetPending(){ return S.checklists.some(c=>c.items.some(it=>regTask(it) && it.st!=='완료' && !autoUndone(it) && sheetCh(it,c))); }
 function applySheet(){
   const ms = S.product.sheet?.matches || [], done = [];
   if(!ms.length) return done;
-  S.checklists.forEach(c=>{
-    const k = SHEET_CH.find(x=>c.name.includes(x)); if(!k) return;
+  S.checklists.forEach(c=>c.items.forEach(it=>{
+    if(it.st==='완료' || !regTask(it) || autoUndone(it)) return;
+    const k = sheetCh(it,c); if(!k) return;
     if(!ms.every(m=>(m.channels.find(x=>x.ch===k)||{}).on)) return;
-    c.items.forEach(it=>{ if(it.st==='완료' || !regTask(it)) return;
-      setDone(it, true); it.memo = (it.memo ? it.memo+' · ' : '') + '시트 등록 확인으로 자동 완료';
-      done.push(c.name+' '+bare(it.name)); });
-  });
+    setDone(it, true); it.memo = (it.memo ? it.memo+' · ' : '') + '시트 등록 확인으로 자동 완료';
+    done.push(bare(it.name).includes(k)||bare(it.name).includes('스마트스토어') ? bare(it.name) : c.name+' '+bare(it.name));
+  }));
   return done;
 }
 async function lookupCode(){
@@ -164,7 +170,7 @@ function expStepStatus(){ const all=S.exp.filter(xOn).flatMap(x=>x.steps.map(a=>
   if(!all.length) return '대기'; if(all.every(o=>o.a.st==='완료')) return '완료'; if(all.some(o=>xLate(o.x,o.a))) return '지연'; if(all.some(o=>o.a.st!=='대기')) return '진행중'; return '대기'; }
 function vDash(){
   const T = TK(), done = T.filter(t=>t.st==='완료').length, late = T.filter(isLate).length;
-  const stepSt = n => n===13 ? expStepStatus() : stepStatus(n);
+  const stepSt = n => n===EXPN() ? expStepStatus() : stepStatus(n);
   const doneSteps = S.steps.filter((_,i)=>stepSt(i+1)==='완료').length;
   // 위쪽: 업무 진행 카드 + 상태별로 나눈 진행도 막대
   const ing = T.filter(t=>t.st==='진행중' && !isLate(t)).length, hold = T.filter(t=>t.st==='보류').length, wait = T.length - done - ing - late - hold, p = pct(done,T.length);
@@ -174,11 +180,11 @@ function vDash(){
   <div class="dm-bar">${seg('ok',done)}${seg('ing',ing)}${seg('bad',late)}${seg('hold',hold)}</div>
   <div class="dm-scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100%</span></div>
   <div class="dm-lg"><span><i class="ok"></i>완료 ${done}</span><span><i class="ing"></i>진행중 ${ing}</span><span><i class="bad"></i>지연 ${late}</span>${hold?`<span><i class="hold"></i>보류 ${hold}</span>`:''}<span><i></i>대기 ${wait}</span></div></div></div>`;
-  h += `<div class="panel ds-main"><div class="ds-head"><h3>14단계 진행</h3><span class="note">완료 ${doneSteps} / 14단계 · 업무 ${done} / ${T.length}건${late?` · <b class="bad">지연 ${late}건</b>`:''} · 단계를 누르면 업무가 펼쳐져요</span></div><div class="ds-list">`;
+  h += `<div class="panel ds-main"><div class="ds-head"><h3>${S.steps.length}단계 진행</h3><span class="note">완료 ${doneSteps} / ${S.steps.length}단계 · 업무 ${done} / ${T.length}건${late?` · <b class="bad">지연 ${late}건</b>`:''} · 단계를 누르면 업무가 펼쳐져요</span></div><div class="ds-list">`;
   S.steps.forEach((nm,i)=>{
     const n = i+1, st = stepSt(n), open = openSt.has(n);
     let d, tot, rng, chans, owners, body = '';
-    if(n===13){
+    if(n===EXPN()){
       const all = S.exp.filter(xOn).flatMap(x=>x.steps.map(a=>({x,a}))), r = expRange();
       d = all.filter(o=>o.a.st==='완료').length; tot = all.length; rng = r ? md(r.a)+' ~ '+md(r.b) : '진행하는 체험단 없음';
       chans = S.exp.map(x=>`<span class="ds-ch ${goOf(x)==='진행'?'on':''}">${esc(x.name)} <em>${goOf(x)}</em></span>`).join('');
@@ -189,7 +195,7 @@ function vDash(){
     } else {
       const ts = stepTasks(n), r = stepRange(n);
       d = ts.filter(t=>t.st==='완료').length; tot = ts.length; rng = r ? md(addD(S.product.launch,r.s))+' ~ '+md(addD(S.product.launch,r.e)) : '업무 없음';
-      chans = ts.map(t=>`<span class="ds-ch ${t.st==='완료'?'on':isLate(t)?'bad':''}" title="${esc(bare(t.name))} · ${esc(t.owner||'담당 미정')}">${t.st==='완료'?'✓ ':''}${esc(t.ch)}</span>`).join('');
+      chans = ts.map(t=>`<span class="ds-ch ${t.st==='완료'?'on':isLate(t)?'bad':''}" title="${esc(t.ch)} · ${esc(t.owner||'담당 미정')}">${t.st==='완료'?'✓ ':''}${esc(bare(t.name))}</span>`).join('');
       owners = [...new Set(ts.map(t=>t.owner).filter(Boolean))];
       if(open) body = ts.map(t=>{ const lt = isLate(t), s2 = lt ? '지연' : t.st;
         return `<label class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)} · ${esc(t.owner||'담당 미정')}${t.rec==='weekly'?' · 매주 월요일':''}</small></span><span class="td-d ${lt?'bad':''}">${lt?(dnum(TODAY)-t.e)+'일 지남':periodTxt(t)}</span><span class="pill st-${s2}">${s2}</span></label>`; }).join('')
@@ -214,9 +220,9 @@ function vGP(){
 /* ---------- 탭: 업무 순서 ---------- */
 function vFlow(){
   let h = `<h2>신제품 출시 후 업무 순서</h2><p class="lead">상품 페이지를 등록한 날(D-day)부터 아래 순서대로 진행합니다. 기간은 출시일 기준으로 자동 계산됩니다.</p><ol class="seq">`;
-  S.steps.forEach((nm,i)=>{ const n=i+1, r=stepRange(n), xr=(n===13)?expRange():null;
+  S.steps.forEach((nm,i)=>{ const n=i+1, r=stepRange(n), xr=(n===EXPN())?expRange():null;
     const pd = xr ? kdr(xr.a,xr.b) : (r?kd(addD(S.product.launch,r.s))+(r.e!==r.s?' ~ '+kd(addD(S.product.launch,r.e)):''):'');
-    h += `<li><span class="no">${stepNo(n)}</span><span class="nm">${esc(nm)}${n===13?'<button class="mgr" data-goexp="all">체험단 탭에서 관리 →</button>':''}</span><span class="pd">${pd}</span></li>`; });
+    h += `<li><span class="no">${stepNo(n)}</span><span class="nm">${esc(nm)}${n===EXPN()?'<button class="mgr" data-goexp="all">체험단 탭에서 관리 →</button>':''}</span><span class="pd">${pd}</span></li>`; });
   return h + `</ol>`;
 }
 
@@ -402,7 +408,7 @@ function vProg(){
   h += `<div class="panel"><div class="tw"><table><thead><tr>${COLS.map(([k,l])=>`<th><button class="colf ${CF[k]?'on':''}" data-col="${k}" aria-haspopup="true" aria-expanded="${openCol===k}">${l}<span class="ar">${SORT.key===k?(SORT.dir>0?'▲':'▼'):'▾'}</span></button></th>`).join('')}<th></th></tr></thead><tbody>`;
   rows.forEach(({t,i})=>{ const late=isLate(t);
     h += `<tr class="${t.st==='완료'?'done':(late?'late':'')}">
-      <td class="stepc"><select id="tk-${i}-step" data-tk="${i}" data-f="step" aria-label="단계" style="min-width:200px">${t.step?'':'<option value="0" selected>단계 없음</option>'}${S.steps.map((n,k)=>k===12?'':`<option value="${k+1}" ${t.step===k+1?'selected':''}>${stepNo(k+1)} ${esc(n)}</option>`).join('')}</select></td>
+      <td class="stepc"><select id="tk-${i}-step" data-tk="${i}" data-f="step" aria-label="단계" style="min-width:200px">${t.step?'':'<option value="0" selected>단계 없음</option>'}${S.steps.map((n,k)=>k+1===EXPN()?'':`<option value="${k+1}" ${t.step===k+1?'selected':''}>${stepNo(k+1)} ${esc(n)}</option>`).join('')}</select></td>
       <td style="min-width:200px"><input type="text" id="tk-${i}-name" data-tk="${i}" data-f="name" value="${esc(bare(t.name))}">${late?`<span class="pill st-지연" style="margin-top:3px">지연 ${dnum(TODAY)-t.e}일</span>`:''}</td>
       <td style="min-width:110px"><select id="tk-${i}-ch" data-tk="${i}" data-f="ch" aria-label="채널(플랫폼)">${S.checklists.map((c,k)=>`<option value="${k}" ${t._ci===k?'selected':''}>${esc(c.name)}</option>`).join('')}</select></td>
       <td style="min-width:96px">${ownerSel(`tk-${i}-owner`, `data-tk="${i}" data-f="owner"`, t.owner)}</td>
@@ -412,7 +418,7 @@ function vProg(){
       <td style="min-width:150px"><input type="text" id="tk-${i}-memo" data-tk="${i}" data-f="memo" value="${esc(t.memo||'')}"></td>
       <td><button class="btn small ghost" data-deltk="${i}" aria-label="업무 삭제">✕</button></td></tr>`; });
   if(!rows.length) h += `<tr><td colspan="8" class="empty">조건에 맞는 업무가 없습니다. 머리글 필터를 풀어 보세요.</td></tr>`;
-  h += `</tbody></table></div><div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap"><select id="newPlat2" aria-label="플랫폼" style="border:1px solid var(--line);border-radius:4px;padding:4px">${S.checklists.map((c,k)=>`<option value="${k}">${esc(c.name)}</option>`).join('')}</select><select id="newStep" aria-label="단계" style="border:1px solid var(--line);border-radius:4px;padding:4px">${S.steps.map((n,k)=>k===12?'':`<option value="${k+1}">${stepNo(k+1)} ${esc(n)}</option>`).join('')}</select><button class="btn small" id="addTk">+ 업무 추가</button><span class="note">추가한 업무는 플랫폼별 리스트에도 생깁니다. 13 체험단 진행은 「체험단」 탭에서 관리합니다.</span></div></div>
+  h += `</tbody></table></div><div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap"><select id="newPlat2" aria-label="플랫폼" style="border:1px solid var(--line);border-radius:4px;padding:4px">${S.checklists.map((c,k)=>`<option value="${k}">${esc(c.name)}</option>`).join('')}</select><select id="newStep" aria-label="단계" style="border:1px solid var(--line);border-radius:4px;padding:4px">${S.steps.map((n,k)=>k+1===EXPN()?'':`<option value="${k+1}">${stepNo(k+1)} ${esc(n)}</option>`).join('')}</select><button class="btn small" id="addTk">+ 업무 추가</button><span class="note">추가한 업무는 플랫폼별 리스트에도 생깁니다. 체험단 진행 단계는 「체험단」 탭에서 관리합니다.</span></div></div>
   <div class="legend"><span><span class="sw" style="background:var(--ok-soft);border:1px solid var(--ok)"></span>완료</span><span><span class="sw" style="background:var(--bad-soft);border:1px solid var(--bad)"></span>마감 지남</span><span><span class="sw" style="background:var(--info-soft);border:1px solid var(--info)"></span>진행중</span></div>
   <div id="cfdrop" class="cfdrop" hidden></div>`;
   return h;
@@ -539,7 +545,7 @@ document.addEventListener('click', e=>{
   if(b.dataset.gmode){ goalMode=b.dataset.gmode; render(); return; }
   if(b.dataset.dsopen){ const n=+b.dataset.dsopen; openSt.has(n)?openSt.delete(n):openSt.add(n); render(); return; }
   if(b.dataset.goperf){ tab='gp'; goalMode='perf'; perfCp=b.dataset.goperf; render(); window.scrollTo(0,0); return; }
-  if(b.dataset.gostep){ const n=+b.dataset.gostep; if(n===13){ tab='exp'; expSel='all'; } else { tab='work'; workMode='prog'; CF={step:[stepNo(n)+' '+stepName(n)]}; } render(); return; }
+  if(b.dataset.gostep){ const n=+b.dataset.gostep; if(n===EXPN()){ tab='exp'; expSel='all'; } else { tab='work'; workMode='prog'; CF={step:[stepNo(n)+' '+stepName(n)]}; } render(); return; }
   if(b.id==='lnAdd'){ addProduct(); return; }
   if(b.dataset.lndel){ delProduct(b.dataset.lndel, b.dataset.name); return; }
   if(b.dataset.tab){ tab=b.dataset.tab; editPeriod=-1; openCol=null; render(); try{localStorage.setItem('fleur-launch-tab',tab);}catch(_){} return; }
@@ -635,7 +641,7 @@ document.addEventListener('change', e=>{
   if(ds.tkd!=null && el.value){ const t=TK()[+ds.tkd]; t[ds.f]=dnum(el.value); if(t.e<t.s){ if(ds.f==='s') t.e=t.s; else t.s=t.e; } markDirty(); render(el.id); return; }
   if(ds.tk!=null){ const t=TK()[+ds.tk];
     if(ds.f==='st'){ if(el.value==='완료') setDone(t,true); else t.st=el.value; }
-    else if(ds.f==='step'){ t.step=+el.value; t.name=withStep(t.name,t.step); t.rec = t.step===12?'weekly':t.rec; }
+    else if(ds.f==='step'){ t.step=+el.value; t.name=withStep(t.name,t.step); t.rec = weeklyStep(t.step)?'weekly':t.rec; }
     else if(ds.f==='name'){ t.name=withStep(el.value.trim()||'새 업무', t.step); }
     else if(ds.f==='ch'){ const to=+el.value; if(to!==t._ci){ S.checklists[t._ci].items.splice(t._ii,1); S.checklists[to].items.push(t); } }
     else t[ds.f]=el.value;
@@ -715,7 +721,7 @@ async function openProduct(id){
   PID = id; S = null; lookingUp = false; lookErr = ''; VER = 0; rev = savedRev = 0; dirty = false; saveErr = '';
   calMonth = null; expSel = 'all'; expEdit = ''; expMonth = null; expHide = {}; calHide = {}; CF = {}; openCol = null; editPeriod = -1; delPlat = -1; perfCp = 'W1'; resetArm = false;
   try{ await load(); }catch(_){ alert('이 제품을 불러오지 못했어요. 목록을 다시 볼게요.'); return showList(); }
-  openSt = new Set(S.steps.map((_,i)=>i+1).filter(n=>n!==13 && stepStatus(n)==='지연'));
+  openSt = new Set(S.steps.map((_,i)=>i+1).filter(n=>n!==EXPN() && stepStatus(n)==='지연'));
   const shAt = Date.parse((S.product.sheet?.at||'').replace(/Z?$/,'Z')) + new Date().getTimezoneOffset()*6e4;
   if(S.product.code && sheetPending() && !(Date.now() - shAt < 30*60e3)) setTimeout(lookupCode, 300);
   $('#lnList').classList.add('hidden'); $('#lnWelcome').classList.add('hidden'); $('#lnProduct').classList.remove('hidden');
