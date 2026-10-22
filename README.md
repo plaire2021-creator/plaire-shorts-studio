@@ -30,12 +30,8 @@ powershell -ExecutionPolicy Bypass -File "%USERPROFILE%\.claude\plugins\cache\pl
 - 서버가 오류로 꺼지면 지킴이(`watchdog.ps1`)가 몇 초 뒤 다시 켜요. 기록은 `%USERPROFILE%\plaire-shorts\logs\` (30일 보관).
 - 비밀 파일 위치: `%USERPROFILE%\.secrets\google-sheets-key.json`, `%USERPROFILE%\.secrets\ohouse_pw.txt`, `%USERPROFILE%\plaire-shorts\config.json`, `tokens.json` — 저장소에는 없어요.
 
-### 업데이트
-```
-claude plugin marketplace update plaire-tools
-claude plugin update plaire-shorts-studio@plaire-tools
-```
-업데이트가 설치되면 켜져 있는 도구가 **하던 일(영상 생성·업로드·집계·답글 작성)이 끝난 뒤** 새 버전 구성요소를 미리 깔고 스스로 갈아타요(1분 안에, 끊김 1초 정도). 따로 다시 켤 필요 없어요.
+### 업데이트 (자동)
+새 버전을 GitHub에 올리면 **각 PC의 업무 도구가 알아서 받아요** — 켜지고 1분 뒤와 30분마다 GitHub을 확인해 받고(`claude plugin marketplace update` + `plugin update`를 스스로 실행), 하던 일(영상 생성·업로드·집계·답글 작성)이 끝나면 새 버전 구성요소를 미리 깐 뒤 갈아타요(끊김 1초 정도). PC에서 할 일은 없어요. 지금 바로 확인시키려면 `POST http://localhost:4173/api/update/check`.
 
 ### 여러 PC에서 같은 설정 쓰기
 연결 설정(앱 ID·시크릿)은 `%USERPROFILE%\plaire-shorts\config.json` 에 저장돼요. 이 파일을 다른 PC의 같은 위치에 복사하면 ID 입력을 건너뛸 수 있어요. 로그인 토큰(`tokens.json`)은 보안상 PC마다 "연결" 버튼으로 한 번씩 연결하는 걸 권장해요.
