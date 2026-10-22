@@ -67,6 +67,7 @@ export function startRun({ id, brand, product_name, product_dir, topic = "" }) {
     `플러그인 루트: ${PLUGIN_ROOT}`,
     `브랜드: ${brand}`,
     `타깃 고객: ${TARGET[brand]}`,
+    `글쓴이: ${brand} 판매자(담당자) — 소비자·구매자 입장의 1인칭 경험담 금지, 판매자가 고객에게 알려 주는 시점으로`,
     topic ? `원하는 주제(담당자 요청 — 이 주제를 중심으로 쓰고, 그 안에서 검색 수요 큰 키워드를 고른다): ${topic}` : "원하는 주제: 없음 — 타깃 고객이 지금 많이 찾는 주제·키워드를 직접 조사해서 고른다",
     `제품명: ${product_name}`,
     `제품 폴더(제품 사진 + 상세페이지_등록): ${product_dir}`,
