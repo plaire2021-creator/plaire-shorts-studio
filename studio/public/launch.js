@@ -729,7 +729,7 @@ async function showList(){
   try{ const r = await fetch('/api/launch/products'); if(!r.ok) throw 0; list = (await r.json()).products; }
   catch(_){ box.innerHTML = '<div class="err-box">제품 목록을 불러오지 못했어요. 업무 도구 서버가 켜져 있는지 확인하고 새로고침해 주세요.</div>'; return; }
   const keep = { name: $('#lnNewName')?.value || '', launch: $('#lnNewLaunch')?.value || TODAY };
-  box.innerHTML = `<section class="card"><div class="card-head"><h2>새 제품 추가</h2><span class="tag">업무·체험단 틀은 매뉴얼 그대로</span></div>
+  box.innerHTML = `<section class="card"><div class="card-head"><h2>새 제품 추가</h2></div>
     <div class="ln-new">
       <div class="fg"><span class="fg-label">브랜드</span><div class="seg ln-brand" role="radiogroup" aria-label="브랜드">${BRANDS.map(b=>`<button type="button" role="radio" data-lnbrand="${b}" aria-checked="${b===newBrand}" class="${b===newBrand?'on':''}">${b}</button>`).join('')}</div></div>
       <div class="fg"><label class="fg-label" for="lnNewName">제품명</label><input class="field" id="lnNewName" placeholder="예: 블랑누아 월넛 거실장 2600" value="${esc(keep.name)}"></div>
@@ -743,8 +743,8 @@ async function showList(){
 const pastP = p => dOf(p.launch) > 60 || (p.total && p.done === p.total);
 function lnRows(title, list, empty){
   const rows = list.map(p=>{
-    const d = dOf(p.launch), all = p.total && p.done===p.total, c = p.late ? 'red' : all ? 'green' : 'amber';
-    return `<div class="active-row ${c}" data-lnopen="${esc(p.id)}" role="button" tabindex="0"><span class="name">${p.brand?brandTag(p.brand):''}${esc(p.name)}<small>${p.next?'다음 할 일 · '+esc(p.next):'남은 업무 없음'}</small></span><span class="muted ln-meta">출시 ${p.launch.replace(/-/g,'.')} · ${dlabel(d)}</span><span class="ln-bar" title="완료 ${p.done}/${p.total}"><i style="width:${pct(p.done,p.total)}%"></i></span><span class="tag ${c}">완료 ${p.done}/${p.total}${p.late?` · 지연 ${p.late}`:''}</span><span class="go">열기</span><button class="del" data-lndel="${esc(p.id)}" data-name="${esc(p.name)}">삭제</button></div>`; }).join('');
+    const all = p.total && p.done===p.total, c = p.late ? 'red' : all ? 'green' : 'amber';
+    return `<div class="active-row ${c}" data-lnopen="${esc(p.id)}" role="button" tabindex="0"><span class="name">${p.brand?brandTag(p.brand):''}${esc(p.name)}</span><span class="muted ln-meta">출시 ${p.launch.replace(/-/g,'.')}</span><span class="ln-bar" title="완료 ${p.done}/${p.total}"><i style="width:${pct(p.done,p.total)}%"></i></span><span class="tag ${c}">완료 ${p.done}/${p.total}${p.late?` · 지연 ${p.late}`:''}</span><span class="go">열기</span><button class="del" data-lndel="${esc(p.id)}" data-name="${esc(p.name)}">삭제</button></div>`; }).join('');
   return `<section class="active-jobs">${title?`<div class="active-head">${title} <span class="count-badge">${list.length}</span></div>`:''}${rows || (empty?`<p class="active-empty">${empty}</p>`:'')}</section>`;
 }
 async function openProduct(id){
