@@ -8,6 +8,7 @@
   data/매출 통계/**          주간·월간 통합파일·CSV·원본 사본 (다음 집계가 이어 쓰는 핵심)
   data/config.json, tokens.json   앱 설정·유튜브/인스타/틱톡 연결
   data/review-runs/**, weekly-runs/**, monthly-runs/**   리뷰 답글·집계 기록
+  data/launch/**            신제품 출시 매뉴얼 (팀 공용 체크·일정·실적)
   data/jobs/*/job.json      영상 작업 기록 (영상 파일은 용량이 커서 빼고, 채널에 이미 올라가 있음)
   secrets/*                 구글 시트 키·오늘의집 파일 비밀번호
 마지막 줄에 결과 JSON을 출력한다.
@@ -28,7 +29,7 @@ KEEP = 14
 def items():
     """(디스크 경로, zip 안 경로) 목록"""
     out = []
-    for sub in ("매출 통계", "review-runs", "weekly-runs", "monthly-runs"):
+    for sub in ("매출 통계", "review-runs", "weekly-runs", "monthly-runs", "launch"):
         base = os.path.join(DATA, sub)
         for root, _dirs, files in os.walk(base):
             for f in files:

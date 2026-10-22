@@ -1,0 +1,611 @@
+(function(){
+// 팀장님 매뉴얼의 화면 코드를 옮기고, 저장만 서버(/api/launch)로 바꿨다 — 팀 모두가 같은 내용을 본다
+let S = null, VER = 0, rev = 0, savedRev = 0, saving = false, saveErr = '', saveTimer = null;
+let ART = null, readOnly = false, dirty = false, tab = 'dash', calMonth = null, perfCp = 'W1', resetArm = false, delPlat = -1, editPeriod = -1;
+let calHide = {}, calColor = 'st';
+let expSel = 'all', expEdit = '', expMonth = null, expHide = {};
+let CF = {}, SORT = {key:'step', dir:1}, openCol = null, cfQ = '';
+const STS = ['대기','진행중','완료','보류'];
+const PCOL = ['var(--accent)','var(--x0)','var(--warn)','var(--x2)','var(--x3)','var(--info)','var(--muted)','var(--ok)'];
+const pcol = ci => PCOL[ci % PCOL.length];
+const STC = {완료:'var(--ok)',진행중:'var(--info)',대기:'var(--accent)',보류:'var(--warn)',지연:'var(--bad)'};
+const ROOT = document.getElementById('launchView');
+const $ = s => ROOT.querySelector(s);
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const won = n => (Math.round(n)||0).toLocaleString('ko-KR');
+const man = n => { n = Math.round(n)||0; return (n/10000).toLocaleString('ko-KR',{maximumFractionDigits:1})+'만'; };
+const pct = (a,b) => b ? Math.round(a/b*100) : 0;
+const parse = s => { const [y,m,d] = s.split('-').map(Number); return Date.UTC(y,m-1,d); };
+const fmt = t => new Date(t).toISOString().slice(0,10);
+const addD = (s,n) => fmt(parse(s)+n*864e5);
+const md = s => { const d=new Date(parse(s)); return (d.getUTCMonth()+1)+'/'+d.getUTCDate(); };
+const WD = ['일','월','화','수','목','금','토'];
+const wd = s => WD[new Date(parse(s)).getUTCDay()];
+const kd = s => { const d=new Date(parse(s)); return (d.getUTCMonth()+1)+'월 '+d.getUTCDate()+'일'; };
+const TODAY = (()=>{ const n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); })();
+const dnum = s => Math.round((parse(s)-parse(S.product.launch))/864e5);
+const dlabel = n => n===0 ? 'D-day' : (n>0 ? 'D+'+n : 'D'+n);
+const tStart = t => addD(S.product.launch, t.s);
+const tEnd = t => addD(S.product.launch, t.e);
+const isLate = t => t.st!=='완료' && t.st!=='보류' && tEnd(t) < TODAY;
+const stepNo = n => String(n).padStart(2,'0');
+const stepName = n => S.steps[n-1] || '';
+// 플랫폼별 리스트의 항목 하나 = 진행현황 업무 하나 (같은 객체를 함께 씀)
+const defp = (o,k,v) => Object.defineProperty(o,k,{value:v,writable:true,configurable:true,enumerable:false});
+function TK(){ const out=[]; S.checklists.forEach((c,ci)=>c.items.forEach((it,ii)=>{ defp(it,'ch',c.name); defp(it,'_ci',ci); defp(it,'_ii',ii); out.push(it); })); return out; }
+const bare = n => String(n||'').replace(/^\s*\[\d+\]\s*/,'');
+const stepOfName = n => { const m=String(n||'').match(/^\s*\[(\d+)\]/); return m?+m[1]:0; };
+const withStep = (n,st) => st ? '['+stepNo(st)+'] '+bare(n) : bare(n);
+function newItem(name, step){ step = step || stepOfName(name); const r=stepRange(step)||{s:0,e:30};
+  return {name: withStep(name, step), step, owner:S.product.team, s:r.s, e:r.e, st:'대기', memo:'', rec: step===12?'weekly':null}; }
+function setDone(it, on){ if(on){ if(it.st!=='완료') defp(it,'_prev',it.st); it.st='완료'; } else if(it.st==='완료'){ it.st=(it._prev&&it._prev!=='완료')?it._prev:'대기'; } }
+// 예전 형식(항목 t/done + 별도 tasks) 저장본을 열었을 때
+function migrate(){ S.checklists.forEach(c=>c.items.forEach(it=>{ if(it.name==null){ it.name=it.t; delete it.t; }
+  if(it.step==null) it.step=stepOfName(it.name); if(!it.st) it.st=it.done?'완료':'대기'; delete it.done;
+  if(it.s==null){ it.s=0; it.e=30; } if(it.owner==null) it.owner=S.product.team; if(it.memo==null) it.memo=''; if(it.rec===undefined) it.rec=it.step===12?'weekly':null; }));
+  delete S.tasks; }
+const stepTasks = n => TK().filter(t=>t.step===n);
+function stepRange(n){ const ts=stepTasks(n); if(!ts.length) return null; return {s:Math.min(...ts.map(t=>t.s)), e:Math.max(...ts.map(t=>t.e))}; }
+function stepStatus(n){ const ts=stepTasks(n); if(!ts.length) return '대기';
+  if(ts.every(t=>t.st==='완료')) return '완료'; if(ts.some(isLate)) return '지연'; if(ts.some(t=>t.st==='진행중'||t.st==='완료')) return '진행중'; if(ts.every(t=>t.st==='보류')) return '보류'; return '대기'; }
+const EXPST = ['대기','진행중','완료','보류'];
+const PST = ['섭외중','확정','발송완료','게시완료','취소'];
+const xStart = (x,st) => addD(x.start, st.s);
+const xEnd = (x,st) => addD(x.start, st.e);
+const xLate = (x,st) => xOn(x) && st.st!=='완료' && st.st!=='보류' && xEnd(x,st) < TODAY;
+const GO = ['진행','검토중','미진행'];
+const goOf = x => x.go || '검토중';
+const xOn = x => goOf(x) !== '미진행';
+const segGo = (xi,x) => `<span class="lseg" role="group" aria-label="${esc(x.name)} 진행 여부">${GO.map(g=>`<button data-go="${g}" data-goi="${xi}" aria-pressed="${goOf(x)===g}">${g}</button>`).join('')}</span>`;
+const pLate = p => p.plan && p.plan < TODAY && p.st!=='게시완료' && p.st!=='취소';
+function expRange(){ let a=null,b=null; S.exp.filter(xOn).forEach(x=>x.steps.forEach(st=>{ const s1=xStart(x,st), e1=xEnd(x,st); if(!a||s1<a)a=s1; if(!b||e1>b)b=e1; })); return a?{a,b}:null; }
+const kdr = (a,b) => kd(a)+(b&&b!==a?' ~ '+kd(b):'');
+const periodTxt = t => kd(tStart(t))+(t.e!==t.s?' ~ '+kd(tEnd(t)):'');
+
+function markDirty(){ dirty = true; rev++; renderTop(); queueSave(); }
+function renderTop(){
+  if(!S) return;
+  $('#lnProd').textContent = S.product.name;
+  $('#lnDday').textContent = dlabel(dnum(TODAY));
+  $('#lnLaunch').textContent = '출시 '+S.product.launch.replace(/-/g,'.')+' ('+wd(S.product.launch)+')';
+  const m = $('#lnSave');
+  m.textContent = saveErr || (saving ? '저장 중…' : dirty ? '저장 대기 중…' : '모두 저장됨');
+  m.className = 'tag ' + (saveErr ? 'red' : (saving||dirty) ? 'amber' : 'green');
+}
+
+/* ---------- 계산 ---------- */
+function chCalc(c){
+  const sales = c.price*c.qty, mg = c.margin*c.qty, cost = c.ad+c.promo+c.etc;
+  const be = c.margin>0 ? c.price/c.margin : 0;
+  return {sales, mg, cost, net: mg-cost, ratio: sales? cost/sales:0, be, tgt: be*S.roasMult};
+}
+function chTotals(){
+  const t = {qty:0,sales:0,mg:0,cost:0,ad:0,net:0};
+  S.channels.forEach(c=>{ const r=chCalc(c); t.qty+=c.qty; t.sales+=r.sales; t.mg+=r.mg; t.cost+=r.cost; t.ad+=c.ad; t.net+=r.net; });
+  return t;
+}
+function perfRow(cp, c){
+  const d = (S.perf[cp]||{})[c.name] || {qty:0,sales:0,ad:0,adSales:0,cost:0};
+  const days = S.checkpoints.find(x=>x.key===cp).d;
+  const goal = c.qty*days/30;
+  const roas = d.ad>0 ? d.adSales/d.ad : null;
+  const r = chCalc(c);
+  const net = d.qty*c.margin - d.ad - d.cost;
+  let j = '점검';
+  if(d.ad>0){ j = roas>=r.tgt ? '확대' : (roas>=r.be ? '유지' : '하향'); }
+  else if(d.qty>=goal && goal>0) j = '유지';
+  return {d, goal, roas, be:r.be, tgt:r.tgt, net, j, ach: goal? d.qty/goal : 0};
+}
+function hasPerf(cp){ const p=S.perf[cp]; return p && Object.values(p).some(v=>v.qty||v.sales||v.ad); }
+function jLabel(j){ return {확대:'예산 확대',유지:'유지',하향:'입찰 하향',점검:'원인 점검'}[j]; }
+
+/* ---------- 탭: 대시보드 ---------- */
+function vDash(){
+  const T = TK(), done = T.filter(t=>t.st==='완료').length, late = T.filter(isLate), ing = T.filter(t=>t.st==='진행중').length;
+  const week = T.filter(t=>t.st!=='완료' && tStart(t)<=addD(TODAY,7) && tEnd(t)>=TODAY);
+  const tot = chTotals();
+  const lastCp = [...S.checkpoints].reverse().find(c=>hasPerf(c.key));
+  let h = `<div class="example">${esc(S.product.memo)}</div>`;
+  h += `<div class="tiles">
+    <div class="tile"><div class="k">전체 업무 진행률</div><div class="v">${pct(done,T.length)}%</div><div class="s">완료 ${done} / ${T.length}건</div></div>
+    <div class="tile ${late.length?'alert':''}"><div class="k">마감 지난 업무</div><div class="v">${late.length}건</div><div class="s">완료·보류 제외</div></div>
+    <div class="tile"><div class="k">앞으로 7일 할 일</div><div class="v">${week.length}건</div><div class="s">${md(TODAY)} ~ ${md(addD(TODAY,7))}</div></div>
+    <div class="tile"><div class="k">1개월 목표 매출</div><div class="v">${man(tot.sales)}</div><div class="s">목표 ${tot.qty}대 · 마케팅비 ${man(tot.cost)}</div></div>
+    <div class="tile"><div class="k">목표 달성 시 순이익</div><div class="v">${man(tot.net)}</div><div class="s">마진 ${man(tot.mg)} − 마케팅비</div></div>
+    <div class="tile"><div class="k">진행중 업무</div><div class="v">${ing}건</div><div class="s">대기 ${T.filter(t=>t.st==='대기').length}건</div></div>
+  </div><div class="grid g2">`;
+  h += `<div class="panel"><h3>업무 순서별 진행</h3>`;
+  S.steps.forEach((nm,i)=>{ const n=i+1; if(n===13){ const all=S.exp.filter(xOn).flatMap(x=>x.steps), d=all.filter(x=>x.st==='완료').length, v=pct(d,all.length);
+      h += `<div class="prow"><div><span class="sn">13</span>${esc(nm)} <span class="note">(체험단 탭)</span></div><div class="bar"><i style="width:${v}%;background:var(--wood)"></i></div><div class="pct">${v}%</div></div>`; return; }
+    const ts=stepTasks(n), d=ts.filter(t=>t.st==='완료').length, st=stepStatus(n), v=pct(d,ts.length);
+    h += `<div class="prow"><div><span class="sn">${stepNo(n)}</span>${esc(nm)}</div><div class="bar"><i style="width:${v}%;background:${STC[st]}"></i></div><div class="pct"><span class="pill st-${st}" style="padding:0 6px">${st}</span></div></div>`; });
+  h += `</div><div class="grid" style="align-content:start"><div class="panel"><h3>체험단 현황</h3><div class="tw"><table><thead><tr><th>종류</th><th>진행</th><th>기간</th><th class="num">프로세스</th><th class="num">참여자</th><th class="num">게시 완료</th></tr></thead><tbody>${S.exp.map(x=>{ const d=x.steps.filter(a=>a.st==='완료').length, act=x.people.filter(p=>p.st!=='취소').length, po=x.people.filter(p=>p.st==='게시완료').length, r=x.steps.length?{a:addD(x.start,Math.min(...x.steps.map(a=>a.s))),b:addD(x.start,Math.max(...x.steps.map(a=>a.e)))}:null;
+    return `<tr class="${xOn(x)?'':'off'}"><td><b>${esc(x.name)}</b></td><td><span class="gob g-${goOf(x)}" style="margin:0">${goOf(x)}</span></td><td class="note">${r&&xOn(x)?md(r.a)+'~'+md(r.b):'-'}</td><td class="num">${d}/${x.steps.length}</td><td class="num">${act}/${x.target}명</td><td class="num">${po}건</td></tr>`; }).join('')}</tbody></table></div></div>
+  <div class="panel"><h3>플랫폼별 체크리스트 완료율</h3>`;
+  S.checklists.forEach(c=>{ const d=c.items.filter(i=>i.st==='완료').length, v=pct(d,c.items.length);
+    h += `<div class="prow"><div>${esc(c.name)} <span class="note">${d}/${c.items.length}</span></div><div class="bar"><i style="width:${v}%"></i></div><div class="pct">${v}%</div></div>`; });
+  h += `</div><div class="panel"><h3>마감 지난 업무</h3>`;
+  h += late.length ? `<ul class="list">${late.map(t=>`<li><span class="d">${kd(tEnd(t))} 마감</span><span class="t">${esc(bare(t.name))}<br><span class="note">${esc(t.ch)} · ${esc(t.owner||'담당 미정')}</span></span><span class="pill st-지연">지연 ${dnum(TODAY)-t.e}일</span></li>`).join('')}</ul>` : `<p class="note">마감이 지난 업무가 없습니다.</p>`;
+  h += `</div><div class="panel"><h3>앞으로 7일 할 일</h3>`;
+  h += week.length ? `<ul class="list">${week.map(t=>`<li><span class="d">${md(tStart(t))}~${md(tEnd(t))}</span><span class="t">${esc(bare(t.name))}<br><span class="note">${esc(t.ch)}${t.rec==='weekly'?' · 매주 월요일':''}</span></span><span class="pill st-${isLate(t)?'지연':t.st}">${isLate(t)?'지연':t.st}</span></li>`).join('')}</ul>` : `<p class="note">7일 안에 진행할 업무가 없습니다.</p>`;
+  h += `</div></div></div>`;
+  h += `<div class="panel" style="margin-top:16px"><h3>최근 성과 점검 ${lastCp?'· '+lastCp.name+' (D+'+lastCp.d+', '+kd(addD(S.product.launch,lastCp.d))+')':''}</h3>`;
+  if(lastCp){
+    h += `<div class="tw"><table><thead><tr><th>채널</th><th class="num">판매/기간목표</th><th class="num">달성률</th><th class="num">ROAS</th><th class="num">손익분기</th><th class="num">순이익</th><th>판정</th></tr></thead><tbody>`;
+    S.channels.forEach(c=>{ const r=perfRow(lastCp.key,c);
+      h += `<tr><td>${esc(c.name)}</td><td class="num">${r.d.qty} / ${r.goal.toFixed(1)}대</td><td class="num">${Math.round(r.ach*100)}%</td><td class="num">${r.roas==null?'-':Math.round(r.roas*100)+'%'}</td><td class="num">${Math.round(r.be*100)}%</td><td class="num">${won(r.net)}</td><td><span class="pill j-${r.j}">${jLabel(r.j)}</span></td></tr>`; });
+    h += `</tbody></table></div>`;
+  } else h += `<p class="note">아직 입력된 실적이 없습니다. 「성과 분석」 탭에서 1주차 실적을 입력하세요.</p>`;
+  h += `</div><div class="panel" style="margin-top:16px"><h3>제품 정보</h3><div class="prodform">
+    <label>제품명<input id="pf-name" type="text" value="${esc(S.product.name)}"></label>
+    <label>출시일 (상품 등록일, D-day)<input id="pf-launch" type="date" value="${S.product.launch}"></label>
+    <label>카테고리<input id="pf-cat" type="text" value="${esc(S.product.category)}"></label>
+    <label>기본 담당<input id="pf-team" type="text" value="${esc(S.product.team)}"></label>
+  </div><p class="note">출시일을 바꾸면 모든 업무 일정·캘린더·성과 점검일이 함께 바뀝니다.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px"><button class="btn small danger" id="resetBtn">${resetArm?'한 번 더 누르면 초기화됩니다':'새 제품으로 시작 (상태·체크·실적 비우기)'}</button>${resetArm?'<button class="btn small" id="resetCancel">취소</button>':''}</div></div>`;
+  return h;
+}
+
+/* ---------- 탭: 업무 순서 ---------- */
+function vFlow(){
+  let h = `<h2>신제품 출시 후 업무 순서</h2><p class="lead">상품 페이지를 등록한 날(D-day)부터 아래 순서대로 진행합니다. 기간은 출시일 기준으로 자동 계산됩니다.</p><ol class="seq">`;
+  S.steps.forEach((nm,i)=>{ const n=i+1, r=stepRange(n), xr=(n===13)?expRange():null;
+    const pd = xr ? kdr(xr.a,xr.b) : (r?kd(addD(S.product.launch,r.s))+(r.e!==r.s?' ~ '+kd(addD(S.product.launch,r.e)):''):'');
+    h += `<li><span class="no">${stepNo(n)}</span><span class="nm">${esc(nm)}${n===13?'<button class="mgr" data-goexp="all">체험단 탭에서 관리 →</button>':''}</span><span class="pd">${pd}</span></li>`; });
+  return h + `</ol>`;
+}
+
+/* ---------- 탭: 체크리스트 (편집 가능) ---------- */
+function vCheck(){
+  let h = `<h2>플랫폼별 진행 리스트</h2><p class="lead">여기 항목이 그대로 「진행현황」 업무가 됩니다. 체크하면 진행현황 상태가 '완료'로, 진행현황에서 완료로 바꾸면 여기도 체크됩니다. 항목 앞의 [번호]는 업무 순서 번호입니다. 순서는 항목을 마우스로 끌어 놓아 바꿉니다.</p><div class="grid g3">`;
+  S.checklists.forEach((c,ci)=>{ const d=c.items.filter(i=>i.st==='완료').length;
+    h += `<div class="ck" data-card="${ci}"><div class="hd"><input type="text" id="pn-${ci}" data-pname="${ci}" value="${esc(c.name)}" aria-label="플랫폼 이름"><span>${d}/${c.items.length}</span></div><div class="bar" style="margin-bottom:8px"><i style="width:${pct(d,c.items.length)}%"></i></div>`;
+    c.items.forEach((it,ii)=>{ h += `<div class="ckrow ${it.st==='완료'?'on':''}" draggable="true" data-drag="${ci}-${ii}"><span class="grip" title="끌어서 순서 변경" aria-hidden="true">⠿</span><input type="checkbox" id="ck-${ci}-${ii}" data-ck="${ci}-${ii}" ${it.st==='완료'?'checked':''} aria-label="완료"><input type="text" id="ct-${ci}-${ii}" data-ct="${ci}-${ii}" value="${esc(it.name)}" aria-label="항목 내용" draggable="false">${it.st!=='완료'&&it.st!=='대기'?`<span class="pill st-${isLate(it)?'지연':it.st}" style="flex:none;font-size:11px">${isLate(it)?'지연':it.st}</span>`:(isLate(it)?'<span class="pill st-지연" style="flex:none;font-size:11px">지연</span>':'')}<button class="btn ghost" data-delit="${ci}-${ii}" aria-label="항목 삭제">✕</button></div>`; });
+    h += `<div class="ckadd"><input type="text" id="na-${ci}" data-newit="${ci}" placeholder="+ 새 항목 입력 후 Enter"><button class="btn small" data-addit="${ci}">추가</button></div>
+      <div class="ckfoot">${delPlat===ci?`<button class="btn small danger" data-delplat="${ci}">정말 삭제 (항목 ${c.items.length}개 포함)</button> <button class="btn small" id="delPlatCancel">취소</button>`:`<button class="btn small ghost" data-delplat="${ci}">플랫폼 삭제</button>`}</div></div>`; });
+  h += `<div class="ck" style="display:flex;flex-direction:column;justify-content:center;gap:8px"><b>플랫폼 추가</b><div class="ckadd" style="margin:0"><input type="text" id="newPlat" placeholder="예: 카카오 선물하기"><button class="btn small" id="addPlat">추가</button></div></div>`;
+  return h + `</div>`;
+}
+
+/* ---------- 탭: 체험단 ---------- */
+function vExp(){
+  let h = `<h2>체험단 운영</h2><p class="lead">체험단은 종류별로 운영 프로세스와 참여자 스케줄을 따로 관리합니다. 시작일을 바꾸면 프로세스 날짜가 함께 바뀝니다.</p>`;
+  h += `<div class="filters"><button class="chip" data-exps="all" aria-pressed="${expSel==='all'}">전체 일정</button>${S.exp.map(x=>`<button class="chip" data-exps="${x.key}" aria-pressed="${expSel===x.key}" style="${xOn(x)?'':'opacity:.55'}">${esc(x.name)}<span class="gob g-${goOf(x)}">${goOf(x)}</span></button>`).join('')}</div>`;
+  if(expSel==='all') return h + vExpAll();
+  const xi = S.exp.findIndex(x=>x.key===expSel), x = S.exp[xi];
+  const d=x.steps.filter(a=>a.st==='완료').length, act=x.people.filter(p=>p.st!=='취소').length, po=x.people.filter(p=>p.st==='게시완료').length;
+  const late = x.steps.filter(a=>xLate(x,a)).length + x.people.filter(pLate).length;
+  h += `<div class="panel"><div class="exphd"><b>${esc(x.name)}</b><span>${esc(x.ch)}</span><span>${esc(x.purpose)}</span><span style="margin-left:auto;display:flex;gap:8px;align-items:center;color:var(--fg)">진행 여부 ${segGo(xi,x)}</span></div>
+    ${goOf(x)==='미진행'?'<div class="offnote">이번 신제품에서는 진행하지 않는 체험단입니다. 캘린더·대시보드·지연 알림에서 빠집니다. 진행하기로 하면 위에서 「진행」을 누르세요.</div>':''}${goOf(x)==='검토중'?'<div class="offnote" style="background:var(--warn-soft);color:var(--warn)">진행 여부를 검토 중입니다. 결정되면 위에서 「진행」 또는 「미진행」을 눌러 주세요.</div>':''}
+    <div class="expset"><label>시작일<input type="date" id="xs-${xi}-start" data-xset="${xi}" data-f="start" value="${x.start}"></label>
+    <label>목표 인원(건)<input type="number" id="xs-${xi}-target" data-xset="${xi}" data-f="target" value="${x.target}" min="0"></label>
+    <label>예산(원)<input type="number" id="xs-${xi}-budget" data-xset="${xi}" data-f="budget" value="${x.budget}" min="0" step="10000"></label>
+    <label>담당<input type="text" id="xs-${xi}-owner" data-xset="${xi}" data-f="owner" value="${esc(x.owner||'')}"></label></div>
+    <div class="tiles" style="margin:0"><div class="tile"><div class="k">프로세스 진행</div><div class="v">${pct(d,x.steps.length)}%</div><div class="s">${d} / ${x.steps.length}단계 완료</div></div>
+    <div class="tile"><div class="k">참여자</div><div class="v">${act}명</div><div class="s">목표 ${x.target}명</div></div>
+    <div class="tile"><div class="k">게시 완료</div><div class="v">${po}건</div><div class="s">달성률 ${pct(po,x.target)}%</div></div>
+    <div class="tile ${late?'alert':''}"><div class="k">일정 지난 항목</div><div class="v">${late}건</div><div class="s">프로세스 + 게시 예정일</div></div></div></div>`;
+  // 운영 프로세스
+  h += `<div class="panel" style="margin-top:16px"><h3>① 운영 프로세스</h3><div class="tw"><table><thead><tr><th>No</th><th>단계</th><th>기간</th><th>담당</th><th>상태</th><th>메모</th><th></th></tr></thead><tbody>`;
+  x.steps.forEach((st,si)=>{ const lt=xLate(x,st), key=xi+'-'+si;
+    h += `<tr class="${st.st==='완료'?'done':(lt?'late':'')}"><td class="stepc"><b>${stepNo(si+1)}</b></td>
+      <td style="min-width:240px"><input type="text" id="xp-${key}-name" data-xp="${key}" data-f="name" value="${esc(st.name)}">${lt?`<span class="pill st-지연" style="margin-top:3px">지연 ${Math.round((parse(TODAY)-parse(xEnd(x,st)))/864e5)}일</span>`:''}</td>
+      <td>${expEdit===key?`<div class="pedit"><input type="date" id="xp-${key}-ds" data-xpd="${key}" data-f="s" value="${xStart(x,st)}" aria-label="시작일"><input type="date" id="xp-${key}-de" data-xpd="${key}" data-f="e" value="${xEnd(x,st)}" aria-label="마감일"><button class="btn small" id="xpDone">확인</button></div>`:`<button class="period" data-xper="${key}" title="눌러서 날짜 변경">${kdr(xStart(x,st),xEnd(x,st))}</button>`}</td>
+      <td style="min-width:80px"><input type="text" id="xp-${key}-owner" data-xp="${key}" data-f="owner" value="${esc(st.owner||'')}"></td>
+      <td style="min-width:96px"><select id="xp-${key}-st" data-xp="${key}" data-f="st" class="s-${st.st}">${EXPST.map(o=>`<option ${o===st.st?'selected':''}>${o}</option>`).join('')}</select></td>
+      <td style="min-width:150px"><input type="text" id="xp-${key}-memo" data-xp="${key}" data-f="memo" value="${esc(st.memo||'')}"></td>
+      <td><button class="btn small ghost" data-xpdel="${key}" aria-label="단계 삭제">✕</button></td></tr>`; });
+  h += `</tbody></table></div><div style="margin-top:10px"><button class="btn small" data-xpadd="${xi}">+ 단계 추가</button></div></div>`;
+  // 참여자 스케줄표
+  h += `<div class="panel" style="margin-top:16px"><h3>② 참여자 스케줄표</h3><p class="note" style="margin:0 0 8px">게시 예정일이 지났는데 게시완료가 아니면 빨간색, 게시완료는 초록색으로 표시됩니다.</p><div class="tw"><table><thead><tr><th>이름·계정</th><th>발송일</th><th>게시 예정일</th><th>게시일</th><th>상태</th><th>게시물 URL</th><th>메모</th><th></th></tr></thead><tbody>`;
+  if(!x.people.length) h += `<tr><td colspan="8" class="empty">아직 등록된 참여자가 없습니다. 아래 「+ 참여자 추가」로 선정된 사람을 넣으세요.</td></tr>`;
+  x.people.forEach((p,pi)=>{ const key=xi+'-'+pi, lt=pLate(p);
+    h += `<tr class="${p.st==='게시완료'?'posted':(p.st==='취소'?'cancel':(lt?'late':''))}">
+      <td style="min-width:140px"><input type="text" id="xq-${key}-name" data-xq="${key}" data-f="name" value="${esc(p.name)}" placeholder="이름 / @계정"></td>
+      <td><input type="date" id="xq-${key}-ship" data-xq="${key}" data-f="ship" value="${p.ship||''}"></td>
+      <td><input type="date" id="xq-${key}-plan" data-xq="${key}" data-f="plan" value="${p.plan||''}">${lt?'<span class="pill st-지연" style="margin-top:3px">게시 지연</span>':''}</td>
+      <td><input type="date" id="xq-${key}-posted" data-xq="${key}" data-f="posted" value="${p.posted||''}"></td>
+      <td style="min-width:96px"><select id="xq-${key}-st" data-xq="${key}" data-f="st">${PST.map(o=>`<option ${o===p.st?'selected':''}>${o}</option>`).join('')}</select></td>
+      <td style="min-width:150px"><input type="text" id="xq-${key}-url" data-xq="${key}" data-f="url" value="${esc(p.url||'')}" placeholder="https://"></td>
+      <td style="min-width:130px"><input type="text" id="xq-${key}-memo" data-xq="${key}" data-f="memo" value="${esc(p.memo||'')}"></td>
+      <td><button class="btn small ghost" data-xqdel="${key}" aria-label="참여자 삭제">✕</button></td></tr>`; });
+  h += `</tbody></table></div><div style="margin-top:10px"><button class="btn small" data-xqadd="${xi}">+ 참여자 추가</button></div></div>`;
+  return h;
+}
+function vExpAll(){
+  const gc = g => S.exp.filter(x=>goOf(x)===g).length;
+  let h = `<div class="panel"><h3>체험단 진행 여부 · 요약</h3><div class="gosum"><span class="gob g-진행">진행 ${gc('진행')}</span><span class="gob g-검토중">검토중 ${gc('검토중')}</span><span class="gob g-미진행">미진행 ${gc('미진행')}</span><span class="note">종류마다 진행 여부를 고르면 캘린더·대시보드에 바로 반영됩니다. 미진행은 일정에서 빠집니다.</span></div><div class="tw"><table><thead><tr><th>종류</th><th>진행 여부</th><th>채널</th><th>기간</th><th class="num">프로세스</th><th class="num">참여자 / 목표</th><th class="num">게시 완료</th><th>지금 할 일</th></tr></thead><tbody>`;
+  S.exp.forEach((x,xi)=>{ const d=x.steps.filter(a=>a.st==='완료').length, act=x.people.filter(p=>p.st!=='취소').length, po=x.people.filter(p=>p.st==='게시완료').length;
+    const nx = xOn(x) ? x.steps.find(a=>a.st!=='완료'&&a.st!=='보류') : null, r=x.steps.length?{a:addD(x.start,Math.min(...x.steps.map(a=>a.s))),b:addD(x.start,Math.max(...x.steps.map(a=>a.e)))}:null;
+    h += `<tr class="${xOn(x)?'':'off'}"><td><button class="mgr" style="margin:0" data-exps="${x.key}">${esc(x.name)}</button></td><td style="opacity:1">${segGo(xi,x)}</td><td class="note">${esc(x.ch)}</td><td class="note" style="white-space:nowrap">${r?kdr(r.a,r.b):''}</td><td class="num">${d}/${x.steps.length}</td><td class="num">${act}/${x.target}명</td><td class="num">${po}건</td><td>${nx?`${esc(nx.name)} <span class="note">(${kdr(xStart(x,nx),xEnd(x,nx))})</span>${xLate(x,nx)?' <span class="pill st-지연">지연</span>':''}`:(xOn(x)?'<span class="note">모두 완료</span>':'<span class="note">진행 안 함</span>')}</td></tr>`; });
+  h += `</tbody></table></div></div>`;
+  const xr = expRange(); if(!xr) return h;
+  const XC = i => `var(--x${i%4})`;
+  if(!expMonth) expMonth = (TODAY>=xr.a && TODAY<=xr.b ? TODAY : xr.a).slice(0,7);
+  const [y,m] = expMonth.split('-').map(Number);
+  const first = Date.UTC(y,m-1,1), startDow = new Date(first).getUTCDay();
+  // 날짜별 일정 모으기: 단계 시작(▶)·마감(■)·하루짜리(●), 참여자 게시 예정(★)
+  const ev = {}; const add=(d,o)=>{(ev[d]=ev[d]||[]).push(o);};
+  S.exp.forEach((x,xi)=>{ if(expHide[x.key] || !xOn(x)) return; const tent = goOf(x)==='검토중';
+    x.steps.forEach((st,si)=>{ const lt=xLate(x,st), base={xi,x,tent,done:st.st==='완료',late:lt,full:`${tent?'(검토중) ':''}[${x.name}] ${stepNo(si+1)} ${st.name} (${kdr(xStart(x,st),xEnd(x,st))} · ${lt?'지연':st.st})`};
+      if(st.s===st.e) add(xStart(x,st),{...base,mk:'●',txt:st.name});
+      else { add(xStart(x,st),{...base,mk:'▶',txt:st.name}); add(xEnd(x,st),{...base,mk:'■',txt:st.name}); } });
+    x.people.forEach(p=>{ if(p.plan && p.st!=='취소') add(p.plan,{xi,x,tent,done:p.st==='게시완료',late:pLate(p),post:1,mk:'★',txt:'게시 예정 · '+(p.name||'참여자'),full:`[${x.name}] 게시 예정 · ${p.name||'참여자'} (${kd(p.plan)} · ${p.st})`}); }); });
+  h += `<div class="panel" style="margin-top:16px"><h3>체험단 전체 스케줄</h3>
+    <div class="calhd"><button class="btn small" id="xcPrev" aria-label="이전 달">◀</button><b>${y}년 ${m}월</b><button class="btn small" id="xcNext" aria-label="다음 달">▶</button><button class="btn small" id="xcToday">오늘</button><button class="btn small" id="xcStart">체험단 시작월</button>
+    <span style="flex:1"></span>${S.exp.map((x,xi)=>xOn(x)?`<button class="xtag" data-xhide="${x.key}" aria-pressed="${!expHide[x.key]}"><i style="background:${XC(xi)}"></i>${esc(x.name)}${goOf(x)==='검토중'?' <span class="gob g-검토중">검토중</span>':''}</button>`:'').join('')}</div>
+    <div class="tw"><div class="cal" style="min-width:680px">${WD.map(w=>`<div class="wd">${w}</div>`).join('')}`;
+  const cells = (startDow + new Date(Date.UTC(y,m,0)).getUTCDate()) > 35 ? 42 : 35;
+  for(let i=0;i<cells;i++){
+    const t = first + (i-startDow)*864e5, d = fmt(t), dt = new Date(t), out = dt.getUTCMonth()!==m-1;
+    const list = (ev[d]||[]).sort((a,b)=>a.xi-b.xi);
+    h += `<div class="day ${out?'out':''} ${d===TODAY?'today':''}"><div class="dn"><span>${dt.getUTCDate()}</span><em>${list.length?list.length+'건':''}</em></div>`;
+    list.forEach(e=>{ h += `<span class="xev ${e.tent?'tent':''} ${e.done?'done':''} ${e.late&&!e.done?'late':''} ${e.post?'post':''}" style="border-left-color:${XC(e.xi)}" title="${esc(e.full)}"><b style="color:${XC(e.xi)}">${e.mk}</b> ${esc(e.txt)}</span>`; });
+    h += `</div>`;
+  }
+  h += `</div></div><div class="legend"><span>▶ 시작</span><span>■ 마감</span><span>● 하루 일정</span><span>★ 참여자 게시 예정</span><span>빨간 배경 = 일정 지남</span><span>취소선 = 완료</span><span>점선·기울임 = 진행 검토중</span><span>미진행 체험단은 표시하지 않습니다.</span><span>색 버튼을 누르면 해당 체험단을 숨기거나 보입니다. 일정에 마우스를 올리면 전체 내용이 보입니다.</span></div></div>`;
+  return h;
+}
+
+/* ---------- 탭: 판매목표·비용 ---------- */
+function vGoal(){
+  const t = chTotals();
+  let h = `<h2>채널별 판매 목표와 마케팅 비용</h2><p class="lead">출시 후 1개월 기준으로 채널마다 목표 수량과 비용을 정합니다. 노란 칸을 입력하면 아래 결과표가 바로 계산됩니다.</p>
+  <div class="example">예시값입니다. 1개당 마진은 구글 시트 「플레르가구 상품등록 현황」 채널별 시트의 '회원 구매 수익'을 넣으세요.</div>`;
+  h += `<div class="panel"><h3>① 입력</h3><div class="tw"><table><thead><tr><th>채널</th><th class="num">판매가</th><th class="num">1개당 마진</th><th class="num">목표 수량</th><th class="num">광고비</th><th class="num">체험단·협찬비</th><th class="num">기타 비용</th><th></th></tr></thead><tbody>`;
+  S.channels.forEach((c,i)=>{
+    h += `<tr><td><input type="text" class="in" id="ch-${i}-name" data-ch="${i}" data-f="name" value="${esc(c.name)}"></td>`;
+    ['price','margin','qty','ad','promo','etc'].forEach(f=>{ h += `<td><input type="number" class="in" id="ch-${i}-${f}" data-ch="${i}" data-f="${f}" value="${c[f]}" min="0" step="${f==='qty'?1:1000}"></td>`; });
+    h += `<td><button class="btn small" data-delch="${i}" aria-label="${esc(c.name)} 삭제">삭제</button></td></tr>`; });
+  h += `</tbody></table></div><div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap"><button class="btn small" id="addCh">+ 채널 추가</button><label class="note">목표 ROAS = 손익분기 ROAS × <input type="number" id="roasMult" value="${S.roasMult}" step="0.1" min="1" style="width:60px;border:1px solid var(--line);border-radius:4px;padding:2px 4px" class="in"></label></div></div>`;
+  h += `<div class="panel" style="margin-top:16px"><h3>② 결과 (1개월)</h3><div class="tw"><table><thead><tr><th>채널</th><th class="num">목표 매출</th><th class="num">총 마진</th><th class="num">마케팅비 합계</th><th class="num">순이익</th><th class="num">매출 대비 비용</th><th class="num">손익분기 ROAS</th><th class="num">목표 ROAS</th></tr></thead><tbody>`;
+  S.channels.forEach(c=>{ const r=chCalc(c);
+    h += `<tr><td>${esc(c.name)}</td><td class="num">${won(r.sales)}</td><td class="num">${won(r.mg)}</td><td class="num">${won(r.cost)}</td><td class="num" style="color:${r.net<0?'var(--bad)':'inherit'}">${won(r.net)}</td><td class="num">${(r.ratio*100).toFixed(1)}%</td><td class="num">${r.be?Math.round(r.be*100)+'%':'-'}</td><td class="num">${c.ad>0&&r.tgt?Math.round(r.tgt*100)+'%':'-'}</td></tr>`; });
+  h += `<tr class="total"><td>합계</td><td class="num">${won(t.sales)}</td><td class="num">${won(t.mg)}</td><td class="num">${won(t.cost)}</td><td class="num">${won(t.net)}</td><td class="num">${t.sales?(t.cost/t.sales*100).toFixed(1):0}%</td><td class="num">-</td><td class="num">-</td></tr></tbody></table></div>
+  <p class="note">손익분기 ROAS = 판매가 ÷ 1개당 마진 (광고비 1원으로 이만큼 팔아야 본전). 광고비가 0인 채널은 목표 ROAS를 표시하지 않습니다.</p></div>`;
+  h += `<div class="grid g2" style="margin-top:16px"><div class="panel"><h3>목표 설정 순서</h3><ol class="rules">
+    <li>채널별 판매가와 1개당 마진(회원 구매 수익)을 확정합니다.</li>
+    <li>최근 비슷한 제품의 첫 달 판매량을 참고해 채널별 목표 수량을 잡습니다.</li>
+    <li>광고비는 판매 비중이 큰 채널(네이버)부터 배분하고, 체험단·협찬비는 리뷰가 필요한 채널에 둡니다.</li>
+    <li>순이익이 마이너스인 채널은 비용을 줄이거나 목표 수량을 다시 봅니다.</li>
+    <li>광고 운영 기준은 목표 ROAS(손익분기 × ${S.roasMult})로 정합니다.</li></ol></div>
+    <div class="panel"><h3>비용 배분 기준</h3><ol class="rules">
+    <li>출시 첫 2주: 리뷰 확보 전이라 롱테일 키워드 위주, 일예산 낮게.</li>
+    <li>리뷰 10건 이후: 메인 키워드 입찰을 단계적으로 올립니다.</li>
+    <li>매주 월요일 ROAS가 손익분기 미만인 키워드·소재는 하향 또는 제외합니다.</li>
+    <li>목표 ROAS를 2주 연속 넘는 채널은 예산을 20%씩 늘립니다.</li></ol></div></div>`;
+  return h;
+}
+
+/* ---------- 탭: 성과 분석 ---------- */
+function vPerf(){
+  const cp = S.checkpoints.find(c=>c.key===perfCp);
+  let h = `<h2>성과 분석</h2><p class="lead">점검일마다 출시일부터 그날까지의 누적 실적을 입력합니다. 기간 목표는 1개월 목표 수량을 일수로 나눠 계산합니다.</p>
+  <div class="filters">${S.checkpoints.map(c=>`<button class="chip" data-cp="${c.key}" aria-pressed="${c.key===perfCp}">${c.name} · D+${c.d} (${md(addD(S.product.launch,c.d))})</button>`).join('')}</div>`;
+  if(perfCp==='W1' && S.perfExample) h += `<div class="example">1주차 실적은 예시값입니다.</div>`;
+  h += `<div class="panel"><h3>① ${cp.name} 실적 입력 (누적)</h3><div class="tw"><table><thead><tr><th>채널</th><th class="num">판매 수량</th><th class="num">매출</th><th class="num">광고비</th><th class="num">광고 전환매출</th><th class="num">체험단·기타 집행비</th></tr></thead><tbody>`;
+  S.channels.forEach((c,i)=>{ const d=((S.perf[perfCp]||{})[c.name])||{};
+    h += `<tr><td>${esc(c.name)}</td>${['qty','sales','ad','adSales','cost'].map(f=>`<td><input type="number" class="in" id="pf-${perfCp}-${i}-${f}" data-pf="${i}" data-f="${f}" value="${d[f]||0}" min="0" step="${f==='qty'?1:1000}"></td>`).join('')}</tr>`; });
+  h += `</tbody></table></div></div>`;
+  h += `<div class="panel" style="margin-top:16px"><h3>② ${cp.name} 목표 대비 결과</h3><div class="tw"><table><thead><tr><th>채널</th><th class="num">기간 목표</th><th class="num">달성률</th><th class="num">ROAS</th><th class="num">손익분기</th><th class="num">목표 ROAS</th><th class="num">순이익</th><th>다음 액션</th></tr></thead><tbody>`;
+  let sq=0,sg=0,sad=0,sads=0,snet=0;
+  S.channels.forEach(c=>{ const r=perfRow(perfCp,c); sq+=r.d.qty; sg+=r.goal; sad+=r.d.ad; sads+=r.d.adSales; snet+=r.net;
+    h += `<tr><td>${esc(c.name)}</td><td class="num">${r.goal.toFixed(1)}대</td><td class="num" style="color:${r.ach<0.7&&r.goal>0?'var(--bad)':'inherit'}">${Math.round(r.ach*100)}%</td><td class="num">${r.roas==null?'-':Math.round(r.roas*100)+'%'}</td><td class="num">${Math.round(r.be*100)}%</td><td class="num">${c.ad>0?Math.round(r.tgt*100)+'%':'-'}</td><td class="num" style="color:${r.net<0?'var(--bad)':'inherit'}">${won(r.net)}</td><td><span class="pill j-${r.j}">${jLabel(r.j)}</span></td></tr>`; });
+  h += `<tr class="total"><td>합계</td><td class="num">${sg.toFixed(1)}대</td><td class="num">${pct(sq,sg)}%</td><td class="num">${sad?Math.round(sads/sad*100)+'%':'-'}</td><td class="num">-</td><td class="num">-</td><td class="num">${won(snet)}</td><td></td></tr></tbody></table></div>
+  <p class="note">순이익 = 판매 수량 × 1개당 마진 − 광고비 − 체험단·기타 집행비. 판정: ROAS ≥ 목표 → 예산 확대 / 손익분기 ≤ ROAS &lt; 목표 → 유지 / ROAS &lt; 손익분기 → 입찰 하향 / 광고 없이 판매 부진 → 원인 점검(상세페이지·가격·노출).</p></div>`;
+  h += `<div class="panel" style="margin-top:16px"><h3>③ 노출·콘텐츠 지표</h3><div class="tw"><table><thead><tr><th>지표</th><th>목표</th>${S.checkpoints.map(c=>`<th>${c.name}</th>`).join('')}</tr></thead><tbody>`;
+  S.kpiItems.forEach((k,ki)=>{ h += `<tr><td>${esc(k)}</td><td><input type="text" class="in" id="kg-${ki}" data-kg="${ki}" value="${esc(S.kpiGoal[k]||'')}"></td>${S.checkpoints.map(c=>`<td><input type="text" class="in" id="kv-${c.key}-${ki}" data-kv="${c.key}" data-ki="${ki}" value="${esc(((S.kpi[c.key]||{})[k])||'')}"></td>`).join('')}</tr>`; });
+  h += `</tbody></table></div></div>`;
+  h += `<div class="panel" style="margin-top:16px"><h3>④ 점검일별 추이</h3><div class="tw"><table><thead><tr><th>점검</th><th class="num">판매 수량</th><th class="num">매출</th><th class="num">광고비</th><th class="num">ROAS</th><th class="num">달성률</th><th class="num">순이익</th></tr></thead><tbody>`;
+  S.checkpoints.forEach(c=>{ if(!hasPerf(c.key)){ h+=`<tr><td>${c.name}</td><td colspan="6" class="note">미입력</td></tr>`; return; }
+    let q=0,s=0,a=0,as=0,g=0,n=0; S.channels.forEach(ch=>{ const r=perfRow(c.key,ch); q+=r.d.qty; s+=r.d.sales; a+=r.d.ad; as+=r.d.adSales; g+=r.goal; n+=r.net; });
+    h += `<tr><td>${c.name}</td><td class="num">${q}</td><td class="num">${won(s)}</td><td class="num">${won(a)}</td><td class="num">${a?Math.round(as/a*100)+'%':'-'}</td><td class="num">${pct(q,g)}%</td><td class="num">${won(n)}</td></tr>`; });
+  h += `</tbody></table></div></div>`;
+  return h;
+}
+
+/* ---------- 탭: 진행현황 ---------- */
+const COLS = [['step','단계'],['name','업무'],['ch','채널'],['owner','담당'],['period','기간'],['st','상태'],['memo','메모']];
+const EMPTY = '(비어 있음)';
+function colVal(t,k){
+  if(k==='step') return t.step ? stepNo(t.step)+' '+stepName(t.step) : '(단계 없음)';
+  if(k==='name') return bare(t.name)||EMPTY;
+  if(k==='period') return kd(tEnd(t))+' 마감';
+  if(k==='st') return isLate(t)?'지연':t.st;
+  const v=(t[k]||'').trim(); return v||EMPTY;
+}
+function colSortKey(t,k){ if(k==='step') return (t.step||99)*1e6+t._ci*1000+t._ii; if(k==='period') return t.e*1000+t.s; if(k==='st') return ['지연','대기','진행중','완료','보류'].indexOf(colVal(t,'st')); return colVal(t,k); }
+function colOptions(k){
+  const m=new Map(); TK().forEach(t=>{ const v=colVal(t,k); m.set(v,(m.get(v)||0)+1); });
+  const arr=[...m.keys()];
+  if(k==='ch'){ const ord=S.checklists.map(c=>c.name); arr.sort((a,b)=>ord.indexOf(a)-ord.indexOf(b)); } else if(k==='step') arr.sort(); else if(k==='period') arr.sort((a,b)=>{ const ta=TK().find(t=>colVal(t,k)===a), tb=TK().find(t=>colVal(t,k)===b); return ta.e-tb.e; });
+  else if(k==='st') arr.sort((a,b)=>['지연','대기','진행중','완료','보류'].indexOf(a)-['지연','대기','진행중','완료','보류'].indexOf(b));
+  else arr.sort((a,b)=>a===EMPTY?1:b===EMPTY?-1:a.localeCompare(b,'ko'));
+  return arr.map(v=>({v,n:m.get(v)}));
+}
+function progRows(){
+  let rows = TK().map((t,i)=>({t,i})).filter(({t})=>COLS.every(([k])=>!CF[k] || CF[k].includes(colVal(t,k))));
+  const k=SORT.key, d=SORT.dir;
+  rows.sort((a,b)=>{ const x=colSortKey(a.t,k), y=colSortKey(b.t,k); return (typeof x==='number'? x-y : String(x).localeCompare(String(y),'ko'))*d || (a.t.step||99)-(b.t.step||99) || a.t._ci-b.t._ci || a.t._ii-b.t._ii; });
+  return rows;
+}
+function vProg(){
+  const rows = progRows();
+  let h = `<h2>진행현황표</h2><p class="lead">「플랫폼별 리스트」의 항목이 업무 순서대로 나옵니다. 여기서 상태를 '완료'로 바꾸면 플랫폼별 리스트에도 체크되고, 반대도 같습니다. 완료된 업무는 초록색, 마감이 지났는데 끝나지 않은 업무는 빨간색으로 표시됩니다. 머리글의 ▾를 누르면 그 열로 필터·정렬할 수 있고, 기간을 누르면 날짜를 바꿀 수 있습니다.</p>`;
+  const act = COLS.filter(([k])=>CF[k]);
+  h += `<div class="cfbar"><span>${rows.length} / ${TK().length}건 표시</span>${act.length?`<span>· 필터: ${act.map(([k,l])=>`<b style="color:var(--accent)">${l}</b>`).join(', ')}</span><button class="btn small" id="cfClearAll">모든 필터 해제</button>`:''}</div>`;
+  h += `<div class="panel"><div class="tw"><table><thead><tr>${COLS.map(([k,l])=>`<th><button class="colf ${CF[k]?'on':''}" data-col="${k}" aria-haspopup="true" aria-expanded="${openCol===k}">${l}<span class="ar">${SORT.key===k?(SORT.dir>0?'▲':'▼'):'▾'}</span></button></th>`).join('')}<th></th></tr></thead><tbody>`;
+  rows.forEach(({t,i})=>{ const late=isLate(t);
+    h += `<tr class="${t.st==='완료'?'done':(late?'late':'')}">
+      <td class="stepc"><select id="tk-${i}-step" data-tk="${i}" data-f="step" aria-label="단계" style="min-width:200px">${t.step?'':'<option value="0" selected>단계 없음</option>'}${S.steps.map((n,k)=>k===12?'':`<option value="${k+1}" ${t.step===k+1?'selected':''}>${stepNo(k+1)} ${esc(n)}</option>`).join('')}</select></td>
+      <td style="min-width:200px"><input type="text" id="tk-${i}-name" data-tk="${i}" data-f="name" value="${esc(bare(t.name))}">${late?`<span class="pill st-지연" style="margin-top:3px">지연 ${dnum(TODAY)-t.e}일</span>`:''}</td>
+      <td style="min-width:110px"><select id="tk-${i}-ch" data-tk="${i}" data-f="ch" aria-label="채널(플랫폼)">${S.checklists.map((c,k)=>`<option value="${k}" ${t._ci===k?'selected':''}>${esc(c.name)}</option>`).join('')}</select></td>
+      <td style="min-width:80px"><input type="text" id="tk-${i}-owner" data-tk="${i}" data-f="owner" value="${esc(t.owner||'')}"></td>
+      <td>${editPeriod===i?`<div class="pedit"><input type="date" id="tk-${i}-ds" data-tkd="${i}" data-f="s" value="${tStart(t)}" aria-label="시작일"><input type="date" id="tk-${i}-de" data-tkd="${i}" data-f="e" value="${tEnd(t)}" aria-label="마감일"><button class="btn small" id="periodDone">확인</button></div>`
+        :`<button class="period" data-period="${i}" title="눌러서 날짜 변경">${periodTxt(t)}</button>${t.rec==='weekly'?'<div class="note">매주 월요일</div>':''}`}</td>
+      <td style="min-width:96px"><select id="tk-${i}-st" data-tk="${i}" data-f="st" class="s-${t.st}">${STS.map(s=>`<option ${s===t.st?'selected':''}>${s}</option>`).join('')}</select></td>
+      <td style="min-width:150px"><input type="text" id="tk-${i}-memo" data-tk="${i}" data-f="memo" value="${esc(t.memo||'')}"></td>
+      <td><button class="btn small ghost" data-deltk="${i}" aria-label="업무 삭제">✕</button></td></tr>`; });
+  if(!rows.length) h += `<tr><td colspan="8" class="empty">조건에 맞는 업무가 없습니다. 머리글 필터를 풀어 보세요.</td></tr>`;
+  h += `</tbody></table></div><div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap"><select id="newPlat2" aria-label="플랫폼" style="border:1px solid var(--line);border-radius:4px;padding:4px">${S.checklists.map((c,k)=>`<option value="${k}">${esc(c.name)}</option>`).join('')}</select><select id="newStep" aria-label="단계" style="border:1px solid var(--line);border-radius:4px;padding:4px">${S.steps.map((n,k)=>k===12?'':`<option value="${k+1}">${stepNo(k+1)} ${esc(n)}</option>`).join('')}</select><button class="btn small" id="addTk">+ 업무 추가</button><span class="note">추가한 업무는 플랫폼별 리스트에도 생깁니다. 13 체험단 진행은 「체험단」 탭에서 관리합니다.</span></div></div>
+  <div class="legend"><span><span class="sw" style="background:var(--ok-soft);border:1px solid var(--ok)"></span>완료</span><span><span class="sw" style="background:var(--bad-soft);border:1px solid var(--bad)"></span>마감 지남</span><span><span class="sw" style="background:var(--info-soft);border:1px solid var(--info)"></span>진행중</span></div>
+  <div id="cfdrop" class="cfdrop" hidden></div>`;
+  return h;
+}
+function renderDrop(keepFocus){
+  const el=document.getElementById('cfdrop'); if(!el) return;
+  if(!openCol){ el.hidden=true; return; }
+  const btn=document.querySelector(`.colf[data-col="${openCol}"]`); if(!btn){ openCol=null; el.hidden=true; return; }
+  const k=openCol, opts=colOptions(k), sel=CF[k], q=cfQ.trim().toLowerCase();
+  const shown=opts.filter(o=>!q||o.v.toLowerCase().includes(q));
+  const allOn=!sel, someOn=sel&&sel.length>0;
+  el.innerHTML = `<div class="srt"><button class="btn small" data-srt="1" aria-pressed="${SORT.key===k&&SORT.dir>0}">▲ 오름차순</button><button class="btn small" data-srt="-1" aria-pressed="${SORT.key===k&&SORT.dir<0}">▼ 내림차순</button></div>
+    ${opts.length>6?`<input type="text" id="cfq" value="${esc(cfQ)}" placeholder="값 검색" aria-label="값 검색">`:''}
+    <div class="vals"><label><input type="checkbox" id="cfall" ${allOn?'checked':''}><span><b>전체 선택</b></span></label>
+    ${shown.map((o,ix)=>`<label><input type="checkbox" data-cfv="${esc(o.v)}" ${(!sel||sel.includes(o.v))?'checked':''}><span title="${esc(o.v)}">${esc(o.v)}</span><em>${o.n}</em></label>`).join('')}
+    ${!shown.length?'<div class="note" style="padding:6px">일치하는 값이 없습니다.</div>':''}</div>
+    <div class="ft"><button class="btn small" id="cfReset">이 열 필터 해제</button><button class="btn small primary" id="cfClose">닫기</button></div>`;
+  el.hidden=false;
+  const allBox=document.getElementById('cfall'); if(allBox) allBox.indeterminate = !allOn && someOn;
+  const r=btn.getBoundingClientRect(), w=el.offsetWidth, vw=document.documentElement.clientWidth;
+  el.style.left=Math.max(16, Math.min(r.left, vw-w-16))+'px'; el.style.top=(r.bottom+4)+'px';
+  if(keepFocus){ const qi=document.getElementById('cfq'); if(qi){ qi.focus(); qi.setSelectionRange(qi.value.length,qi.value.length); } }
+}
+function setColVal(k,v,on){
+  const all=colOptions(k).map(o=>o.v); let cur=CF[k]?[...CF[k]]:[...all];
+  if(on){ if(!cur.includes(v)) cur.push(v); } else cur=cur.filter(x=>x!==v);
+  CF[k] = cur.length===all.length ? undefined : cur; if(!CF[k]) delete CF[k];
+}
+function closeDrop(){ if(openCol){ openCol=null; cfQ=''; render(); } }
+
+/* ---------- 탭: 캘린더 ---------- */
+function calEvents(){
+  const ev = {}; const add=(d,o)=>{(ev[d]=ev[d]||[]).push(o);};
+  TK().forEach(t=>{ if(calHide[S.checklists[t._ci].key]) return;
+    if(t.rec==='weekly'){ for(let n=t.s;n<=t.e;n++){ const d=addD(S.product.launch,n); if(new Date(parse(d)).getUTCDay()===1) add(d,{t,label:t.ch+' · '+bare(t.name),kind:'rec'}); } return; }
+    if(t.s===t.e) add(tStart(t),{t,label:t.ch+' · '+bare(t.name),kind:'one'});
+    else { add(tStart(t),{t,label:'시작 · '+t.ch+' '+bare(t.name),kind:'s'}); add(tEnd(t),{t,label:'마감 · '+t.ch+' '+bare(t.name),kind:'e'}); }
+  });
+  if(!calHide.__cp) S.checkpoints.forEach(c=>add(addD(S.product.launch,c.d),{t:null,label:'성과 점검 · '+c.name,kind:'cp'}));
+  if(!calHide.__exp) S.exp.filter(xOn).forEach(x=>{ x.steps.forEach(st=>{ const t={st:xLate(x,st)?'지연':st.st,ch:x.name,isExp:1}; const nm='['+x.name+'] '+st.name;
+      if(st.s===st.e) add(xStart(x,st),{t,label:nm,kind:'x'}); else { add(xStart(x,st),{t,label:'시작 · '+nm,kind:'x'}); add(xEnd(x,st),{t,label:'마감 · '+nm,kind:'x'}); } });
+    x.people.forEach(p=>{ if(p.plan && p.st!=='취소') add(p.plan,{t:{st:p.st==='게시완료'?'완료':(pLate(p)?'지연':'대기'),ch:x.name,isExp:1},label:'['+x.name+'] 게시 예정 · '+(p.name||'참여자'),kind:'x'}); }); });
+  return ev;
+}
+function vCal(){
+  if(!calMonth) calMonth = TODAY.slice(0,7);
+  const [y,m] = calMonth.split('-').map(Number);
+  const first = Date.UTC(y,m-1,1), startDow = new Date(first).getUTCDay();
+  const ev = calEvents();
+  let h = `<h2>일정 캘린더</h2><p class="lead">업무 시작일과 마감일, 매주 월요일 반복 점검, 성과 점검일을 달력에 표시합니다. 아래 플랫폼 버튼으로 보고 싶은 플랫폼만 켜고 끌 수 있습니다.</p>`;
+  const onlyKey = (()=>{ const keys=[...S.checklists.map(c=>c.key),'__exp','__cp']; const on=keys.filter(k=>!calHide[k]); return on.length===1?on[0]:null; })();
+  h += `<div class="panel" style="padding:12px 14px;margin-bottom:12px"><div class="calhd" style="margin:0 0 8px"><b style="min-width:0;text-align:left;font-size:14px">플랫폼</b>
+    <button class="btn small" id="calAll">전체 보기</button><span class="note">버튼을 누르면 켜고 끕니다 · 이름을 두 번 누르면 그 플랫폼만 봅니다 (달력과 주차별 현황에 함께 적용)</span>
+    <span style="flex:1"></span><span class="note">색 기준</span><span class="lseg"><button data-ccol="st" aria-pressed="${calColor==='st'}">상태</button><button data-ccol="plat" aria-pressed="${calColor==='plat'}">플랫폼</button></span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${S.checklists.map((c,ci)=>`<button class="xtag" data-cplat="${c.key}" aria-pressed="${!calHide[c.key]}" title="${esc(c.name)}"><i style="background:${pcol(ci)}"></i>${esc(c.name)}<span class="c">${c.items.length}</span></button>`).join('')}
+    <button class="xtag" data-cplat="__exp" aria-pressed="${!calHide.__exp}"><i style="background:var(--wood)"></i>체험단</button><button class="xtag" data-cplat="__cp" aria-pressed="${!calHide.__cp}"><i style="background:var(--wood-soft);border:1px solid var(--wood)"></i>성과 점검</button></div></div>`;
+  h += `<div class="calhd"><button class="btn small" id="calPrev" aria-label="이전 달">◀</button><b>${y}년 ${m}월</b><button class="btn small" id="calNext" aria-label="다음 달">▶</button><button class="btn small" id="calToday">오늘</button><button class="btn small" id="calLaunch">출시월</button></div>`;
+  h += `<div class="tw"><div class="cal" style="min-width:640px">${WD.map(w=>`<div class="wd">${w}</div>`).join('')}`;
+  const cells = (startDow + new Date(Date.UTC(y,m,0)).getUTCDate()) > 35 ? 42 : 35;
+  for(let i=0;i<cells;i++){
+    const t = first + (i-startDow)*864e5, d = fmt(t), dt = new Date(t), out = dt.getUTCMonth()!==m-1, n = dnum(d);
+    h += `<div class="day ${out?'out':''} ${d===TODAY?'today':''} ${n===0?'launch':''}"><div class="dn"><span>${dt.getUTCDate()}</span><em>${n>=-7&&n<=90?dlabel(n):''}</em></div>`;
+    (ev[d]||[]).forEach(e=>{
+      if(e.kind==='cp'){ h += `<span class="ev cp">${esc(e.label)}</span>`; return; }
+      const st = e.t.isExp ? e.t.st : (isLate(e.t)?'지연':e.t.st);
+      const bc = calColor==='plat' ? (e.t.isExp?'var(--wood)':pcol(e.t._ci)) : STC[st];
+      h += `<span class="ev ${e.kind==='rec'?'rec':''} ${e.t.st==='완료'?'done':''}" style="border-left-color:${bc}${calColor==='plat'&&st==='지연'?';background:var(--bad-soft)':''}" title="${esc(e.label)} (${esc(e.t.ch)}, ${st})">${esc(e.label)}</span>`; });
+    h += `</div>`;
+  }
+  h += `</div></div><div class="legend">${calColor==='st'?['대기','진행중','완료','지연','보류'].map(s=>`<span><span class="sw" style="background:${STC[s]}"></span>${s}</span>`).join(''):S.checklists.map((c,ci)=>`<span><span class="sw" style="background:${pcol(ci)}"></span>${esc(c.name)}</span>`).join('')+'<span>빨간 배경 = 지연</span>'}<span><span class="sw" style="background:var(--wood-soft);border:1px solid var(--wood)"></span>성과 점검일</span><span>점선 = 매주 반복</span><span>[ ] = 체험단 일정</span></div>`;
+  // 주차별 업무: 진행현황 기간의 시작일이 속한 주(출시일 = 1주차 첫날), 매주 반복 업무는 해당 기간의 모든 주에 표시
+  const all = TK(), TT = all.filter(t=>!calHide[S.checklists[t._ci].key]);
+  const wk = n => Math.floor(n/7)+1, curW = wk(dnum(TODAY));
+  const weeks = {};
+  TT.forEach(t=>{ const w0=Math.max(1,wk(t.s)), w1=Math.max(1,wk(t.e));
+    if(t.rec==='weekly'){ for(let w=w0; w<=w1; w++) (weeks[w]=weeks[w]||[]).push(t); } else (weeks[w0]=weeks[w0]||[]).push(t); });
+  const wl = Object.keys(weeks).map(Number).sort((x,y)=>x-y);
+  const doneAll = TT.filter(t=>t.st==='완료').length;
+  h += `<div class="panel" style="margin-top:16px"><h3>주차별 업무 현황 <span class="note" style="font-weight:400">· 완료 ${doneAll} / ${TT.length}건 · 완료/미완료는 「진행현황」 상태를 따라 자동으로 바뀝니다</span></h3>
+    <p class="note" style="margin:0 0 12px">진행현황의 기간 시작일을 기준으로 주차를 나눴습니다(출시일 ${kd(S.product.launch)} = 1주차 첫날). 매주 반복 업무는 해당 주마다 표시됩니다. 상태를 바꾸려면 「진행현황」 탭에서 바꾸세요.</p>
+    <div class="weeks">`;
+  if(!wl.length) h += `<p class="empty">선택한 플랫폼이 없습니다. 위 플랫폼 버튼을 켜 주세요.</p>`;
+  wl.forEach(w=>{ const list = weeks[w].sort((x,y)=>(x.step||99)-(y.step||99)||x._ci-y._ci||x._ii-y._ii);
+    const d = list.filter(t=>t.st==='완료').length, ws = addD(S.product.launch,(w-1)*7), we = addD(S.product.launch,w*7-1);
+    const state = w<curW ? 'past' : (w===curW ? 'now' : 'next');
+    h += `<div class="wk ${state}"><div class="wkside"><div style="display:flex;gap:6px;align-items:baseline"><b>${w}주차</b>${state==='now'?'<span class="pill st-진행중">이번 주</span>':''}</div><span class="note">${md(ws)}(${wd(ws)}) ~ ${md(we)}(${wd(we)})</span>
+      <span class="wkcnt">완료 ${d} / ${list.length}</span><div class="bar"><i style="width:${pct(d,list.length)}%;background:${d===list.length?'var(--ok)':'var(--accent)'}"></i></div></div><div class="wkbody">`;
+    list.forEach(t=>{ const i=all.indexOf(t), done=t.st==='완료', late=isLate(t);
+      h += `<div class="wkrow ${done?'on':(late?'late':'')}"><span class="sn">${stepNo(t.step)}</span><span class="wkch" style="color:${pcol(t._ci)}" title="${esc(t.ch)}">${esc(t.ch)}</span><span class="wkt">${esc(bare(t.name))}${t.rec==='weekly'?' <span class="note">· 매주</span>':''}</span><span class="wkp">${md(tStart(t))}~${md(tEnd(t))}</span><span class="pill ${done?'st-완료':(late?'st-지연':'st-대기')}">${done?'완료':(late?'미완료·지연':'미완료')}</span></div>`; });
+    h += `</div></div>`; });
+  h += `</div></div>`;
+  return h;
+}
+
+/* ---------- 렌더·이벤트 ---------- */
+const TABS = [['dash','대시보드',vDash],['flow','업무 순서',vFlow],['check','플랫폼별 리스트',vCheck],['exp','체험단',vExp],['goal','판매 목표·비용',vGoal],['perf','성과 분석',vPerf],['prog','진행현황',vProg],['cal','캘린더',vCal]];
+function shell(){
+  ROOT.innerHTML = `<div class="welcome"><h1>신제품 출시 매뉴얼</h1><p>상품을 등록한 날(D-day)부터 채널별 할 일·체험단·판매 목표·성과를 한곳에서 챙겨요. 고친 내용은 자동으로 저장되고 팀 모두에게 똑같이 보여요.</p></div>
+  <section class="card ln-head"><div class="ln-prod"><span class="tag blue" id="lnDday"></span><b id="lnProd"></b><span class="muted" id="lnLaunch"></span><span class="muted">오늘 ${TODAY.replace(/-/g,'.')}</span></div><span class="tag" id="lnSave"></span></section>
+  <div class="seg ln-tabs" role="tablist">${TABS.map(([k,l],i)=>`<button role="tab" data-tab="${k}" class="${k===tab?'on':''}"><span class="n">${i+1}</span>${l}</button>`).join('')}</div>
+  <section id="lnView"></section>`;
+}
+function render(focusId){
+  ROOT.querySelectorAll('.ln-tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
+  $('#lnView').innerHTML = TABS.find(x=>x[0]===tab)[2]();
+  renderTop();
+  if(tab==='prog') renderDrop();
+  if(focusId){ const el=document.getElementById(focusId); if(el){ el.focus(); if(el.setSelectionRange && el.type==='text'){ const l=el.value.length; el.setSelectionRange(l,l);} } }
+}
+function num(v){ const n=parseFloat(v); return isNaN(n)?0:n; }
+function addItem(ci){ const el=document.getElementById('na-'+ci); const v=(el&&el.value||'').trim(); if(!v) return; S.checklists[ci].items.push(newItem(v)); markDirty(); render('na-'+ci); }
+function addPlat(){ const el=$('#newPlat'); const v=(el&&el.value||'').trim(); if(!v) return; S.checklists.push({key:'p'+Date.now(),name:v,items:[]}); markDirty(); render('na-'+(S.checklists.length-1)); }
+document.addEventListener('click', e=>{
+  if(!ROOT.contains(e.target)) return;
+  const b = e.target.closest('button'); if(!b) return;
+  if(b.dataset.tab){ tab=b.dataset.tab; editPeriod=-1; openCol=null; render(); try{localStorage.setItem('fleur-launch-tab',tab);}catch(_){} return; }
+  if(b.dataset.goexp){ tab='exp'; expSel=b.dataset.goexp; render(); return; }
+  if(b.dataset.exps){ expSel=b.dataset.exps; expEdit=''; render(); return; }
+  if(b.id==='xcPrev'||b.id==='xcNext'){ let [y,m]=expMonth.split('-').map(Number); m+= b.id==='xcNext'?1:-1; if(m<1){m=12;y--;} if(m>12){m=1;y++;} expMonth=y+'-'+String(m).padStart(2,'0'); render(); return; }
+  if(b.id==='xcToday'){ expMonth=TODAY.slice(0,7); render(); return; }
+  if(b.id==='xcStart'){ const r=expRange(); if(r) expMonth=r.a.slice(0,7); render(); return; }
+  if(b.dataset.goi!=null){ S.exp[+b.dataset.goi].go=b.dataset.go; markDirty(); render(); return; }
+  if(b.dataset.xhide){ const k=b.dataset.xhide; expHide[k]=!expHide[k]; render(); return; }
+  if(b.dataset.xper){ expEdit=b.dataset.xper; render('xp-'+expEdit+'-ds'); return; }
+  if(b.id==='xpDone'){ expEdit=''; render(); return; }
+  if(b.dataset.xpadd!=null){ const x=S.exp[+b.dataset.xpadd]; const last=x.steps[x.steps.length-1]; const s0=last?last.e:0; x.steps.push({name:'새 단계',s:s0,e:s0,st:'대기',owner:x.owner||'',memo:''}); markDirty(); render('xp-'+b.dataset.xpadd+'-'+(x.steps.length-1)+'-name'); return; }
+  if(b.dataset.xpdel){ const [xi,si]=b.dataset.xpdel.split('-').map(Number); S.exp[xi].steps.splice(si,1); expEdit=''; markDirty(); render(); return; }
+  if(b.dataset.xqadd!=null){ const x=S.exp[+b.dataset.xqadd]; x.people.push({name:'',ship:'',plan:'',posted:'',st:'섭외중',url:'',memo:''}); markDirty(); render('xq-'+b.dataset.xqadd+'-'+(x.people.length-1)+'-name'); return; }
+  if(b.dataset.xqdel){ const [xi,pi]=b.dataset.xqdel.split('-').map(Number); S.exp[xi].people.splice(pi,1); markDirty(); render(); return; }
+  if(b.dataset.cp){ perfCp=b.dataset.cp; render(); return; }
+  if(b.dataset.col){ const k=b.dataset.col; openCol = openCol===k ? null : k; cfQ=''; render(); return; }
+  if(b.dataset.srt){ SORT={key:openCol, dir:+b.dataset.srt}; render(); return; }
+  if(b.id==='cfReset'){ delete CF[openCol]; render(); return; }
+  if(b.id==='cfClose'){ closeDrop(); return; }
+  if(b.id==='cfClearAll'){ CF={}; render(); return; }
+  if(b.dataset.period!=null){ editPeriod=+b.dataset.period; render('tk-'+editPeriod+'-ds'); return; }
+  if(b.id==='periodDone'){ editPeriod=-1; render(); return; }
+  if(b.id==='calPrev'||b.id==='calNext'){ let [y,m]=calMonth.split('-').map(Number); m+= b.id==='calNext'?1:-1; if(m<1){m=12;y--;} if(m>12){m=1;y++;} calMonth=y+'-'+String(m).padStart(2,'0'); render(); return; }
+  if(b.dataset.cplat){ const k=b.dataset.cplat, now=Date.now();
+    if(window.__lastPlat===k && now-window.__lastPlatT<400){ const keys=[...S.checklists.map(c=>c.key),'__exp','__cp']; calHide={}; keys.forEach(x=>{ if(x!==k) calHide[x]=true; }); }
+    else calHide[k]=!calHide[k];
+    window.__lastPlat=k; window.__lastPlatT=now; render(); return; }
+  if(b.id==='calAll'){ calHide={}; render(); return; }
+  if(b.dataset.ccol){ calColor=b.dataset.ccol; render(); return; }
+  if(b.id==='calToday'){ calMonth=TODAY.slice(0,7); render(); return; }
+  if(b.id==='calLaunch'){ calMonth=S.product.launch.slice(0,7); render(); return; }
+  if(b.id==='addCh'){ S.channels.push({name:'새 채널',price:0,margin:0,qty:0,ad:0,promo:0,etc:0}); markDirty(); render(); return; }
+  if(b.dataset.delch!=null){ S.channels.splice(+b.dataset.delch,1); markDirty(); render(); return; }
+  if(b.dataset.addit!=null){ addItem(+b.dataset.addit); return; }
+  if(b.dataset.delit){ const [ci,ii]=b.dataset.delit.split('-').map(Number); S.checklists[ci].items.splice(ii,1); markDirty(); render(); return; }
+  if(b.dataset.delplat!=null){ const ci=+b.dataset.delplat; if(delPlat!==ci){ delPlat=ci; render(); return; } S.checklists.splice(ci,1); delPlat=-1; markDirty(); render(); return; }
+  if(b.id==='delPlatCancel'){ delPlat=-1; render(); return; }
+  if(b.id==='addPlat'){ addPlat(); return; }
+  if(b.id==='addTk'){ const step=+$('#newStep').value, ci=+$('#newPlat2').value; const it=newItem('새 업무', step); S.checklists[ci].items.push(it);
+    CF={}; markDirty(); render(); const i=TK().indexOf(it); const el=document.getElementById('tk-'+i+'-name'); if(el){ el.focus(); el.select(); } return; }
+  if(b.dataset.deltk!=null){ const t=TK()[+b.dataset.deltk]; S.checklists[t._ci].items.splice(t._ii,1); editPeriod=-1; markDirty(); render(); return; }
+  if(b.id==='resetBtn'){ if(!resetArm){ resetArm=true; render(); return; }
+    resetArm=false; TK().forEach(t=>{t.st='대기'; t.memo='';}); S.perf={}; S.kpi={}; S.perfExample=false; S.exp.forEach(x=>{ x.steps.forEach(a=>{a.st='대기'; a.memo='';}); x.people=[]; x.go='검토중'; });
+    S.product.name='새 제품명을 입력하세요'; S.product.memo='새 제품 출시 진행 중입니다.'; markDirty(); render(); return; }
+  if(b.id==='resetCancel'){ resetArm=false; render(); return; }
+});
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Enter' || e.isComposing || !ROOT.contains(e.target)) return;
+  const el=e.target;
+  if(el.dataset && el.dataset.newit!=null){ e.preventDefault(); addItem(+el.dataset.newit); }
+  else if(el.id==='newPlat'){ e.preventDefault(); addPlat(); }
+});
+let dragSrc=null;
+function clearDrag(){ document.querySelectorAll('.ckrow.over,.ck.overend,.ckrow.dragging').forEach(e=>e.classList.remove('over','overend','dragging')); }
+document.addEventListener('dragstart', e=>{ if(!ROOT.contains(e.target)) return; const r=e.target.closest&&e.target.closest('.ckrow[data-drag]'); if(!r) return; dragSrc=r.dataset.drag.split('-').map(Number); r.classList.add('dragging'); try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain', r.dataset.drag); }catch(_){} });
+document.addEventListener('dragover', e=>{ if(!dragSrc) return; const r=e.target.closest('.ckrow[data-drag]'), c=e.target.closest('.ck[data-card]'); if(!r&&!c) return; e.preventDefault();
+  document.querySelectorAll('.ckrow.over,.ck.overend').forEach(x=>x.classList.remove('over','overend')); if(r) r.classList.add('over'); else c.classList.add('overend'); });
+document.addEventListener('drop', e=>{ if(!dragSrc) return; const r=e.target.closest('.ckrow[data-drag]'), c=e.target.closest('.ck[data-card]'); if(!r&&!c){ dragSrc=null; clearDrag(); return; } e.preventDefault();
+  const [sc,si]=dragSrc; const item=S.checklists[sc].items.splice(si,1)[0]; let tc, ti;
+  if(r){ [tc,ti]=r.dataset.drag.split('-').map(Number); if(tc===sc && ti>si) ti--; } else { tc=+c.dataset.card; ti=S.checklists[tc].items.length; }
+  S.checklists[tc].items.splice(ti,0,item); dragSrc=null; markDirty(); render(); });
+document.addEventListener('dragend', ()=>{ dragSrc=null; clearDrag(); });
+document.addEventListener('mousedown', e=>{ if(openCol && !e.target.closest('#cfdrop') && !e.target.closest('.colf')) closeDrop(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && openCol) closeDrop(); });
+window.addEventListener('scroll', ()=>{ if(openCol) renderDrop(); }, {passive:true});
+window.addEventListener('resize', ()=>{ if(openCol) renderDrop(); });
+let qTimer=null;
+document.addEventListener('input', e=>{
+  if(e.target.id==='cfq'){ cfQ=e.target.value; renderDrop(true); }
+});
+document.addEventListener('change', e=>{
+  if(!ROOT.contains(e.target)) return;
+  const el = e.target, ds = el.dataset;
+  if(el.id==='cfall'){ if(el.checked) delete CF[openCol]; else CF[openCol]=[]; render(); return; }
+  if(ds.cfv!=null){ setColVal(openCol, ds.cfv, el.checked); render(); return; }
+  if(ds.xset!=null){ const x=S.exp[+ds.xset]; if(ds.f==='start'){ if(el.value) x.start=el.value; } else x[ds.f]= ds.f==='owner'?el.value:num(el.value); markDirty(); render(); return; }
+  if(ds.xpd && el.value){ const [xi,si]=ds.xpd.split('-').map(Number), x=S.exp[xi], st=x.steps[si]; st[ds.f]=Math.round((parse(el.value)-parse(x.start))/864e5); if(st.e<st.s){ if(ds.f==='s') st.e=st.s; else st.s=st.e; } markDirty(); render(el.id); return; }
+  if(ds.xp){ const [xi,si]=ds.xp.split('-').map(Number); S.exp[xi].steps[si][ds.f]=el.value; markDirty(); if(ds.f==='st') render(); else renderTop(); return; }
+  if(ds.xq){ const [xi,pi]=ds.xq.split('-').map(Number), p=S.exp[xi].people[pi]; p[ds.f]=el.value; if(ds.f==='posted'&&el.value&&p.st!=='취소') p.st='게시완료'; markDirty(); if(['st','plan','posted'].includes(ds.f)) render(); else renderTop(); return; }
+  if(ds.ck){ const [ci,ii]=ds.ck.split('-').map(Number); setDone(S.checklists[ci].items[ii], el.checked); markDirty(); render(); return; }
+  if(ds.ct){ const [ci,ii]=ds.ct.split('-').map(Number); const v=el.value.trim(); if(v){ const it=S.checklists[ci].items[ii]; it.name=v; const n=stepOfName(v); if(n) it.step=n; } else S.checklists[ci].items.splice(ii,1); markDirty(); render(); return; }
+  if(ds.pname!=null){ const v=el.value.trim(); if(v){ S.checklists[+ds.pname].name=v; markDirty(); } render(); return; }
+  if(ds.ch!=null){ const c=S.channels[+ds.ch]; const old=c.name; c[ds.f]= ds.f==='name'?el.value:num(el.value);
+    if(ds.f==='name'){ Object.values(S.perf).forEach(p=>{ if(p[old]){ p[el.value]=p[old]; delete p[old]; } }); }
+    markDirty(); render(); return; }
+  if(el.id==='roasMult'){ S.roasMult=num(el.value)||1.3; markDirty(); render(); return; }
+  if(ds.pf!=null){ const c=S.channels[+ds.pf]; S.perf[perfCp]=S.perf[perfCp]||{}; const r=S.perf[perfCp][c.name]=S.perf[perfCp][c.name]||{qty:0,sales:0,ad:0,adSales:0,cost:0}; r[ds.f]=num(el.value); S.perfExample=false; markDirty(); render(); return; }
+  if(ds.kg!=null){ S.kpiGoal[S.kpiItems[+ds.kg]]=el.value; markDirty(); return; }
+  if(ds.kv){ S.kpi[ds.kv]=S.kpi[ds.kv]||{}; S.kpi[ds.kv][S.kpiItems[+ds.ki]]=el.value; markDirty(); return; }
+  if(ds.tkd!=null && el.value){ const t=TK()[+ds.tkd]; t[ds.f]=dnum(el.value); if(t.e<t.s){ if(ds.f==='s') t.e=t.s; else t.s=t.e; } markDirty(); render(el.id); return; }
+  if(ds.tk!=null){ const t=TK()[+ds.tk];
+    if(ds.f==='st'){ if(el.value==='완료') setDone(t,true); else t.st=el.value; }
+    else if(ds.f==='step'){ t.step=+el.value; t.name=withStep(t.name,t.step); t.rec = t.step===12?'weekly':t.rec; }
+    else if(ds.f==='name'){ t.name=withStep(el.value.trim()||'새 업무', t.step); }
+    else if(ds.f==='ch'){ const to=+el.value; if(to!==t._ci){ S.checklists[t._ci].items.splice(t._ii,1); S.checklists[to].items.push(t); } }
+    else t[ds.f]=el.value;
+    markDirty(); if(['st','step','ch'].includes(ds.f)) render(); else renderTop(); return; }
+  if(el.id==='pf-name'){ S.product.name=el.value; markDirty(); return; }
+  if(el.id==='pf-launch' && el.value){ S.product.launch=el.value; calMonth=null; markDirty(); render(); return; }
+  if(el.id==='pf-cat'){ S.product.category=el.value; markDirty(); return; }
+  if(el.id==='pf-team'){ S.product.team=el.value; markDirty(); return; }
+});
+
+/* ---------- 저장 (서버, 자동) ---------- */
+function queueSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(save, 700); }
+async function save(){
+  if(!dirty) return;
+  if(saving){ queueSave(); return; }
+  saving = true; renderTop();
+  const sent = rev;
+  try{
+    const r = await fetch('/api/launch', {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({version: VER, state: S})});
+    const j = await r.json().catch(()=>({}));
+    if(r.status===409){
+      S = j.state; VER = j.version; migrate(); dirty = false; savedRev = rev;
+      saveErr = '다른 분이 먼저 고쳐서 최신 내용으로 다시 불러왔어요. 방금 바꾼 칸은 다시 입력해 주세요.';
+      saving = false; render(); return;
+    }
+    if(!r.ok) throw new Error(j.error || 'save');
+    VER = j.version; savedRev = sent; dirty = rev !== savedRev; saveErr = '';
+  }catch(_){ saveErr = '저장하지 못했어요. 잠시 후 다시 저장할게요.'; setTimeout(queueSave, 5000); }
+  saving = false; renderTop();
+  if(dirty && !saveErr) queueSave();
+}
+async function load(){
+  const r = await fetch('/api/launch');
+  if(!r.ok) throw new Error('load');
+  const j = await r.json();
+  S = j.state; VER = j.version; migrate();
+}
+
+/* ---------- 시작 ---------- */
+try{ const t=localStorage.getItem('fleur-launch-tab'); if(t && TABS.some(x=>x[0]===t)) tab=t; }catch(_){}
+// 사이드바에서 이 화면을 열 때마다 최신 내용을 받아 온다 (고치는 중이면 그대로 둔다)
+window.launchOpen = async function(){
+  if(!ROOT.dataset.ready){ shell(); ROOT.dataset.ready = '1'; }
+  if(!dirty && !saving){
+    try{ await load(); saveErr = ''; }
+    catch(_){ if(!S){ $('#lnView').innerHTML = '<div class="err-box">매뉴얼을 불러오지 못했어요. 업무 도구 서버가 켜져 있는지 확인하고 새로고침해 주세요.</div>'; return; } }
+  }
+  render();
+};
+// 주소가 처음부터 #/launch면 app.js의 첫 화면 전환이 이 파일보다 먼저 돌아서 여기서 연다
+if(location.hash.replace(/^#\/?/,'')==='launch') window.launchOpen();
+window.addEventListener('beforeunload', ()=>{ if(dirty) fetch('/api/launch', {method:'PUT', keepalive:true, headers:{'Content-Type':'application/json'}, body: JSON.stringify({version: VER, state: S})}); });
+})();

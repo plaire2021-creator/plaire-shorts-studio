@@ -19,6 +19,7 @@ import * as monthly from "./lib/monthly.js";
 import * as team from "./lib/team.js";
 import * as backup from "./lib/backup.js";
 import * as blog from "./lib/blog.js";
+import * as launch from "./lib/launch.js";
 
 const PORT = Number(process.env.PORT || loadConfig().port || 4173);
 tiktok.setPort(PORT);
@@ -297,6 +298,18 @@ const blogView = (r) => {
   if (r.status === "running" && !live && !alive(r.server_pid)) return { ...r, status: "failed", error: "스튜디오가 꺼져서 중단됐어요. 다시 넣어 주세요" };
   return { ...r, running: live || (r.status === "running" && alive(r.server_pid)) };
 };
+// ---------- 신제품 출시 매뉴얼 (팀 공용) ----------
+app.get("/api/launch", (req, res) => res.json(launch.load()));
+app.put("/api/launch", (req, res) => {
+  try {
+    const r = launch.save(Number(req.body?.version), req.body?.state);
+    if (r.conflict) return res.status(409).json(r);
+    res.json({ version: r.version });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 app.get("/api/blog/runs", (req, res) => res.json(blog.listRuns().map(blogView)));
 app.get("/api/blog/runs/:id", (req, res) => {
   const r = blogView(blog.loadRun(req.params.id));

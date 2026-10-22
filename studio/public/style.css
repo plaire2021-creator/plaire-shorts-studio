@@ -277,6 +277,7 @@ span.chip-logo{display:grid;place-items:center;font-size:10px;font-weight:700;co
 .ico-cal{border:1.6px solid currentColor;border-radius:3px}
 .ico-cal::before{content:"";position:absolute;left:0;right:0;top:3px;border-top:1.6px solid currentColor}
 .ico-star::before{content:"★";position:absolute;inset:0;display:grid;place-items:center;font-size:15px;line-height:1}
+.ico-flag::before{content:"⚑";position:absolute;inset:0;display:grid;place-items:center;font-size:15px;line-height:1}
 /* 홈의 도구 카드 */
 .tool-group{display:grid;gap:10px}
 .group-title{font-size:13px;font-weight:700;color:var(--sub);margin:4px 2px 0}
@@ -314,6 +315,7 @@ span.chip-logo{display:grid;place-items:center;font-size:10px;font-weight:700;co
 .tool-ico.ico-cal{border:0}
 .tool-ico.ico-cal::before{left:9px;right:9px;top:10px;bottom:9px;border:2px solid #fff;border-radius:3px;border-top-width:5px}
 .tool-ico.ico-star::before{font-size:20px;color:#fff}
+.tool-ico.ico-flag::before{font-size:20px;color:#fff}
 .empty-card{display:grid;justify-items:center;text-align:center;gap:6px;padding:56px 24px}
 .empty-card b{font-size:16px;margin-top:8px}
 @media (max-width:700px){.tools{grid-template-columns:1fr}}
