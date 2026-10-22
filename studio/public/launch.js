@@ -175,13 +175,15 @@ function expStepStatus(){ const all=S.exp.filter(xOn).flatMap(x=>x.steps.map(a=>
 // 단계마다 그 일을 하는 업무 도구로 바로 가는 버튼 (단계 이름으로 고른다, 맞는 도구가 없으면 버튼 없음)
 const TOOL_LINKS = [
   [/콘텐츠 제작|블로그/, [['블로그 작성 도우미','#/blog'],['숏츠 제작 및 업로드','#/shorts']]],
-  [/숏츠|콘텐츠 등록/, [['숏츠 제작 및 업로드','#/shorts'],['제작된 숏츠 업로드','#/upload']]],
+  // 쿠팡 윙 주소는 로그인 화면이 매번 새 주소(state)를 만들어서 첫 화면으로 둔다 — 로그인 안 돼 있으면 알아서 로그인 화면으로 감
+  [/콘텐츠 등록/, [['쿠팡 윙','https://wing.coupang.com/'],['오늘의집 오로라','https://orora.ohou.se/signin?redirectUrl=%2F']]],
+  [/숏츠/, [['숏츠 제작 및 업로드','#/shorts'],['제작된 숏츠 업로드','#/upload']]],
   [/노출 순위|광고 효율/, [['성과 분석','perf'],['주간 매출 통계','#/weekly-sales']]],
 ];
 function toolLinks(stepName){
   const f = TOOL_LINKS.find(([re])=>re.test(stepName)); if(!f) return '';
   const nextCp = (S.checkpoints.find(c=>addD(S.product.launch,c.d)>=TODAY) || S.checkpoints[S.checkpoints.length-1]).key;
-  return `<div class="ds-foot">${f[1].map(([l,to])=>to==='perf' ? `<button class="btn small" data-goperf="${nextCp}">${l} →</button>` : `<a class="btn small" href="${to}">${l} →</a>`).join('')}</div>`;
+  return `<div class="ds-foot">${f[1].map(([l,to])=>to==='perf' ? `<button class="btn small" data-goperf="${nextCp}">${l} →</button>` : (/^https?:/.test(to) ? `<a class="btn small" href="${to}" target="_blank" rel="noopener">${l} ↗</a>` : `<a class="btn small" href="${to}">${l} →</a>`)).join('')}</div>`;
 }
 // 콘텐츠 단계(이름에 '콘텐츠'·'숏츠'): 업무마다 게시물 링크 칸, 링크를 넣으면 완료로 체크
 const contentStep = n => /콘텐츠|숏츠/.test(S.steps[n-1]||'');
