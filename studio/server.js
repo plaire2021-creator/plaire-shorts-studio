@@ -7,7 +7,7 @@ import { exec, execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import multer from "multer";
-import { DATA_DIR, PLUGIN_ROOT, jobDir, listJobs, loadConfig, loadJob, newJobId, saveConfig, saveJob, setToken } from "./lib/store.js";
+import { DATA_DIR, PLUGIN_ROOT, updateLocalConfig, jobDir, listJobs, loadConfig, loadJob, newJobId, saveConfig, saveJob, setToken } from "./lib/store.js";
 import { claudeAuth, claudeLoginUrl, findClaude, isRunning, isRunningAny, saveDetailImages, startClaudeLogin, startGeneration, stopGeneration, submitClaudeCode, switchClaudeAccount, unzipInto } from "./lib/generate.js";
 import * as youtube from "./lib/youtube.js";
 import * as instagram from "./lib/instagram.js";
@@ -16,12 +16,18 @@ import { findCloudflared } from "./lib/tunnel.js";
 import * as weekly from "./lib/weekly.js";
 import * as reviews from "./lib/reviews.js";
 import * as monthly from "./lib/monthly.js";
+import * as team from "./lib/team.js";
+import * as backup from "./lib/backup.js";
 
 const PORT = Number(process.env.PORT || loadConfig().port || 4173);
 tiktok.setPort(PORT);
 const app = express();
 app.use(express.json({ limit: "2mb" }));
 app.use("/api", (req, res, next) => (res.set("Cache-Control", "no-store"), next())); // 연결 상태가 옛 값으로 보이지 않게
+// 서버 PC 모드: 다른 PC는 팀 비밀번호로 들어온다 (서버 PC 자신은 그냥 통과)
+app.get("/login", (req, res) => (!team.serverMode() || team.isLocal(req) ? res.redirect("/") : res.type("html").send(team.loginPage)));
+app.post("/api/login", team.login);
+app.use(team.guard);
 app.use(express.static(path.join(path.dirname(fileURLToPath(import.meta.url)), "public"), { setHeaders: (res) => res.setHeader("Cache-Control", "no-cache") })); // 업데이트 후 옛 화면이 남지 않게
 
 // 서버가 꺼졌다 켜지면 중간에 끊긴 작업을 실패로 표시
@@ -60,12 +66,15 @@ function view(job) {
 // ---------- 준비 상태 (첫 화면 위쪽 4칸) ----------
 let claudeCache = { at: 0, v: null };
 app.get("/api/status", (req, res) => {
+  res.set("X-Local", team.isLocal(req) ? "1" : "0");
   if (req.query.fresh || Date.now() - claudeCache.at > 15000) claudeCache = { at: Date.now(), v: claudeAuth() };
   res.json({
     claude: { ...claudeCache.v, configured: true, login_url: claudeLoginUrl() },
     youtube: youtube.status(),
     instagram: instagram.status(),
     tiktok: tiktok.status(),
+    local: team.isLocal(req),
+    server_mode: team.serverMode(),
   });
 });
 
@@ -322,7 +331,7 @@ app.get("/media/:id/:file", (req, res) => {
   res.sendFile(f);
 });
 
-app.post("/api/jobs/:id/open-folder", (req, res) => {
+app.post("/api/jobs/:id/open-folder", team.localOnly, (req, res) => {
   const job = loadJob(req.params.id);
   if (!job) return res.sendStatus(404);
   exec(`explorer "${path.join(job.product_dir, "숏츠_영상")}"`);
@@ -358,7 +367,7 @@ app.post("/api/jobs/:id/upload", async (req, res) => {
 });
 
 // ---------- 연결 (버튼 한 번) ----------
-app.post("/api/claude/code", async (req, res) => {
+app.post("/api/claude/code", team.localOnly, async (req, res) => {
   try {
     const r = await submitClaudeCode(req.body?.code);
     claudeCache = { at: 0, v: null };
@@ -367,7 +376,7 @@ app.post("/api/claude/code", async (req, res) => {
     err(res, e);
   }
 });
-app.post("/api/claude/switch", (req, res) => {
+app.post("/api/claude/switch", team.localOnly, (req, res) => {
   try {
     if (isRunningAny()) throw new Error("영상을 만드는 중에는 계정을 바꿀 수 없어요. 끝난 뒤에 다시 눌러 주세요");
     const r = switchClaudeAccount();
@@ -378,7 +387,7 @@ app.post("/api/claude/switch", (req, res) => {
   }
 });
 
-app.post("/api/connect/claude", (req, res) => {
+app.post("/api/connect/claude", team.localOnly, (req, res) => {
   try {
     res.json(startClaudeLogin());
   } catch (e) {
@@ -408,22 +417,22 @@ const startAuth = (fn) => (req, res) => {
   }
 };
 
-app.get("/auth/youtube", startAuth((s) => youtube.authUrl(PORT, s)));
+app.get("/auth/youtube", team.localOnly, startAuth((s) => youtube.authUrl(PORT, s)));
 app.get("/auth/youtube/callback", callbackPage((req) => youtube.handleCallback(PORT, req.query.code), "유튜브"));
-app.get("/auth/instagram", startAuth((s) => instagram.authUrl(PORT, s)));
+app.get("/auth/instagram", team.localOnly, startAuth((s) => instagram.authUrl(PORT, s)));
 app.get("/auth/instagram/callback", callbackPage((req) => instagram.handleCallback(PORT, req.query.code), "인스타그램"));
 // 관리자: Meta 대시보드에서 만든 인스타 액세스 토큰을 직접 붙여넣어 연결
-app.post("/api/connect/instagram", async (req, res) => {
+app.post("/api/connect/instagram", team.localOnly, async (req, res) => {
   try {
     res.json({ account: await instagram.connectWithToken(String(req.body.token || "").trim()) });
   } catch (e) {
     err(res, e);
   }
 });
-app.get("/auth/tiktok", startAuth((s) => tiktok.authUrl(s)));
+app.get("/auth/tiktok", team.localOnly, startAuth((s) => tiktok.authUrl(s)));
 app.get("/auth/tiktok/callback", callbackPage((req) => tiktok.handleCallback(req.query.state, req.query.code), "틱톡"));
 // 틱톡을 https 리디렉트로 쓰는 경우: 이동된 주소창 URL 붙여넣기
-app.post("/api/connect/tiktok", async (req, res) => {
+app.post("/api/connect/tiktok", team.localOnly, async (req, res) => {
   try {
     res.json({ account: await tiktok.connectFromPasted(String(req.body.pasted || "")) });
   } catch (e) {
@@ -431,7 +440,7 @@ app.post("/api/connect/tiktok", async (req, res) => {
   }
 });
 
-app.post("/api/disconnect/:platform", (req, res) => {
+app.post("/api/disconnect/:platform", team.localOnly, (req, res) => {
   if (!["youtube", "instagram", "tiktok"].includes(req.params.platform)) return res.sendStatus(404);
   setToken(req.params.platform, null);
   res.json({ ok: true });
@@ -453,7 +462,7 @@ app.get("/api/admin", (req, res) => {
   });
 });
 // 비어 있거나 가려진(…) 값은 기존 값 유지
-app.put("/api/admin", (req, res) => {
+app.put("/api/admin", team.localOnly, (req, res) => {
   const c = loadConfig();
   const merge = (dst, src) => {
     for (const [k, v] of Object.entries(src || {})) if (typeof v === "string" && !v.includes("…")) dst[k] = v.trim();
@@ -464,6 +473,61 @@ app.put("/api/admin", (req, res) => {
   merge(c.tiktok, req.body.tiktok);
   saveConfig(c);
   res.json({ ok: true });
+});
+
+// ---------- 팀 공유 (서버 PC) ----------
+app.get("/api/server", (req, res) =>
+  res.json({ server_mode: team.serverMode(), has_password: team.hasPassword(), local: team.isLocal(req), addresses: team.addresses(PORT), name: team.NAME }),
+);
+app.put("/api/server", team.localOnly, (req, res) => {
+  try {
+    if (req.body.password) team.setPassword(req.body.password);
+    if (typeof req.body.server_mode === "boolean") {
+      if (req.body.server_mode && !team.hasPassword()) throw new Error("먼저 팀 비밀번호를 정해 주세요");
+      updateLocalConfig({ server_mode: req.body.server_mode });
+    }
+    res.json({ ok: true, restart: typeof req.body.server_mode === "boolean" });
+    // 접속 범위가 바뀌면 다시 켠다 (지킴이가 바로 다시 켬)
+    if (typeof req.body.server_mode === "boolean") setTimeout(() => process.exit(75), 500);
+  } catch (e) {
+    err(res, e);
+  }
+});
+app.get("/api/backups", async (req, res) => {
+  try {
+    res.json({ ...backup.backupStatus(), items: (await backup.listBackups()).items });
+  } catch (e) {
+    res.json({ ...backup.backupStatus(), items: [], error: e.message });
+  }
+});
+app.post("/api/backups", async (req, res) => {
+  try {
+    res.json(await backup.makeBackup("수동"));
+  } catch (e) {
+    err(res, e);
+  }
+});
+app.post("/api/backups/restore", team.localOnly, async (req, res) => {
+  try {
+    if (busyNow()) throw new Error("지금 진행 중인 작업이 있어요. 끝난 뒤에 되살려 주세요");
+    const r = await backup.restoreBackup(req.body.name);
+    res.json(r);
+    setTimeout(() => process.exit(75), 500); // 되살린 설정으로 다시 켜기
+  } catch (e) {
+    err(res, e);
+  }
+});
+// 지금 진행 중인 작업 (모든 사람이 볼 수 있게)
+app.get("/api/activity", (req, res) => {
+  const items = [];
+  for (const j of listJobs()) {
+    if (j.status === "generating" || j.status === "queued") items.push({ kind: "숏츠", label: j.product_name, what: j.kind === "copy" ? "문구 쓰는 중" : "만드는 중" });
+    if (Object.values(j.uploads || {}).some((u) => u.state === "uploading")) items.push({ kind: "업로드", label: j.product_name, what: "올리는 중" });
+  }
+  for (const r of weekly.listRuns()) if (r.running) items.push({ kind: "주간 매출", label: r.company, what: "집계 중" });
+  for (const r of monthly.listRuns()) if (r.running) items.push({ kind: "월간 매출", label: r.company, what: "집계 중" });
+  for (const r of reviews.listRuns()) if (r.running) items.push({ kind: "리뷰 답글", label: r.brand, what: "쓰는 중" });
+  res.json({ items });
 });
 
 // ---------- 안정성 ----------
@@ -543,6 +607,7 @@ async function fetchUpdate() {
 }
 // 화면이나 다른 곳에서 "지금 확인"할 때
 app.post("/api/update/check", async (req, res) => res.json(await fetchUpdate()));
+if (process.env.PLAIRE_WATCHDOG) backup.scheduleBackups(busyNow);
 if (process.env.PLAIRE_WATCHDOG) {
   setTimeout(() => fetchUpdate().catch((e) => console.error(stamp(), e)), 60 * 1000);
   setInterval(() => fetchUpdate().catch((e) => console.error(stamp(), e)), 30 * 60 * 1000);
@@ -554,7 +619,9 @@ const onListen = () => {
   console.log(`${stamp()} 플레르 MS팀 업무 도구 ${VERSION}: ${url}  (데이터: ${DATA_DIR})`);
   if (process.argv.includes("--open")) exec(process.platform === "win32" ? `start "" "${url}"` : `open "${url}"`);
 };
-app.listen(PORT, "127.0.0.1", onListen).on("error", (e) => {
+const HOST = team.serverMode() ? "0.0.0.0" : "127.0.0.1";
+if (team.serverMode()) app.listen(80, "0.0.0.0").on("error", (e) => console.error(`${stamp()} 80번 포트를 쓰지 못해서 주소 뒤에 :${PORT}를 붙여야 해요 (${e.code})`));
+app.listen(PORT, HOST, onListen).on("error", (e) => {
   // 이미 다른 창에서 켜져 있으면 조용히 끝낸다 (지킴이가 잠시 뒤 다시 확인)
   console.error(`${stamp()} 서버를 켜지 못했어요: ${e.code === "EADDRINUSE" ? `${PORT}번이 이미 쓰이는 중` : e.message}`);
   process.exit(98);

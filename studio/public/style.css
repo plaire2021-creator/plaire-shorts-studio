@@ -398,3 +398,20 @@ span.pf-logo{display:grid;place-items:center;font-size:10px;font-weight:700;colo
 .rv-low .low-box{margin:0;padding:12px 14px;background:var(--card);border-radius:10px}
 .m-net{margin:14px 0 0}
 .m-net .check{margin-top:2px}
+
+/* ---------- 팀 공유 · 백업 · 진행 중 ---------- */
+body.remote .local-only{display:none!important}
+.team-box{display:grid;gap:8px;padding:16px 18px;margin:8px 0 18px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
+.team-box h3{margin:6px 0 0;font-size:14px}
+.team-addr{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.team-addr code{padding:5px 10px;border-radius:8px;background:var(--card);border:1px solid var(--line);font-size:13px}
+.team-addr code.main{border-color:var(--blue);color:var(--blue);font-weight:700}
+.team-addr p{width:100%;margin:2px 0 0}
+.bk-list{list-style:none;margin:0;padding:0;display:grid;gap:4px;max-height:260px;overflow:auto}
+.bk-list li{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--card);border:1px solid var(--line);border-radius:8px;font-size:13px}
+.bk-list li span{flex:1}
+.bk-list li small{color:var(--faint)}
+.activity{border:0;background:var(--amber-soft);color:var(--amber);font:inherit;font-size:12.5px;font-weight:700;padding:7px 12px;border-radius:999px;cursor:pointer}
+.activity::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-right:6px;vertical-align:1px;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.activity::before{animation:none}}

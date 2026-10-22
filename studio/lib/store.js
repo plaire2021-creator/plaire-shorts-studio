@@ -46,6 +46,8 @@ export const loadConfig = () => {
   return { ...DEFAULT_CONFIG, ...a, ...c, youtube: pick("youtube"), instagram: pick("instagram"), tiktok: pick("tiktok") };
 };
 export const saveConfig = (c) => writeJson(CONFIG, c);
+// 이 PC 설정 파일에서 일부 값만 바꾼다 (공용 설정과 섞지 않음)
+export const updateLocalConfig = (patch) => writeJson(CONFIG, { ...readJson(CONFIG, {}), ...patch });
 export const loadTokens = () => readJson(TOKENS, {});
 export const saveTokens = (t) => writeJson(TOKENS, t);
 export const setToken = (platform, value) => {

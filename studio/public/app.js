@@ -2,6 +2,7 @@ const $ = (id) => document.getElementById(id);
 const api = async (url, opts = {}) => {
   const r = await fetch(url, { cache: "no-store", headers: opts.body && !(opts.body instanceof FormData) ? { "Content-Type": "application/json" } : {}, ...opts });
   const d = await r.json().catch(() => ({}));
+  if (r.status === 401 && d.login) location.href = "/login"; // 팀 비밀번호 로그인이 풀림
   if (!r.ok) throw new Error(d.error || `오류 (${r.status})`);
   return d;
 };
@@ -40,6 +41,7 @@ async function loadStatus(fresh) {
   const n = READY.filter((p) => status[p.id]?.connected).length;
   $("readySum").textContent = n === READY.length ? "모두 연결됨" : `${READY.length - n}곳 연결 필요`;
   $("readySum").classList.toggle("warn", n !== READY.length);
+  document.body.classList.toggle("remote", status.local === false); // 서버 PC가 아닌 곳에서 열면 서버 PC 전용 버튼 숨김
   renderAccount();
   const hint = $("readyHint");
   if (!status.claude.connected && hint.querySelector("#loginCode") && status.claude.login_url) {
@@ -56,7 +58,9 @@ async function loadStatus(fresh) {
 function renderAccount() {
   const c = status.claude || {};
   const pending = !!c.login_url || accountBusy;
-  const right = pending
+  const right = status.local === false
+    ? `<span class="tag" title="Claude 계정은 서버 PC에서 바꿀 수 있어요">서버 PC</span>`
+    : pending
     ? `<span class="tag amber">로그인 대기</span>`
     : c.connected
       ? `<button class="mini" id="switchBtn">계정 바꾸기</button>`
@@ -94,6 +98,7 @@ $("readyHint").onclick = async (e) => {
 $("ready").onclick = async (e) => {
   const b = e.target.closest("[data-connect]");
   if (!b) return;
+  if (status.local === false) return alert("채널 연결은 서버 PC(plairemstool)에서 해 주세요");
   const id = b.dataset.connect;
   if (id === "instagram") {
     await openSettings();
@@ -531,7 +536,8 @@ $("saveAdmin").onclick = async () => {
 async function openSettings() {
   clearInterval(poll);
   current = null;
-  await loadAdmin();
+  loadTeam();
+  if (status?.local !== false) await loadAdmin();
   show(["settings"]);
 }
 $("settingsBtn").onclick = () => (go("shorts"), openSettings());
@@ -1198,3 +1204,97 @@ $("mHistory").onclick = (e) => {
 document.addEventListener("click", (e) => {
   if (e.target.closest('a[href="#/monthly-sales"]') && route.current === "monthly-sales") (mShowInput(), monthlyOpen());
 });
+
+// ================= 팀 공유 (서버 PC) · 백업 =================
+const fmtSize = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(0)}MB` : `${Math.max(1, Math.round(n / 1e3))}KB`);
+const fmtTime = (t) => new Date(t).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+async function loadTeam() {
+  const t = await api("/api/server").catch(() => null);
+  if (t) {
+    $("teamMode").checked = t.server_mode;
+    $("teamPw").placeholder = t.has_password ? "새 팀 비밀번호 (바꿀 때만)" : "팀 비밀번호 (4자 이상)";
+    $("teamPwBtn").textContent = t.has_password ? "비밀번호 바꾸기" : "비밀번호 정하기";
+    const main = t.addresses.list[0];
+    $("teamNote").textContent = !t.local
+      ? "이 화면은 서버 PC에 접속해서 보고 있어요. 서버 설정·되살리기는 서버 PC에서만 할 수 있어요."
+      : t.server_mode
+        ? "켜져 있어요. 사무실 다른 PC에서는 아래 주소로 들어와서 팀 비밀번호를 넣으면 돼요."
+        : "꺼져 있어요. 켜면 사무실 다른 PC에서 브라우저로 이 업무 도구를 쓸 수 있어요.";
+    $("teamAddr").innerHTML = t.server_mode
+      ? t.addresses.list.map((u, i) => `<code class="${i ? "" : "main"}">${esc(u)}</code>`).join("") +
+        (t.addresses.renamed ? "" : `<p class="muted">주소를 <b>http://${esc(t.name)}</b> 로 쓰려면 이 PC 이름을 '${esc(t.name)}'으로 바꿔 주세요 (설정 › 시스템 › 정보 › 이 PC 이름 바꾸기 → 다시 시작).</p>`)
+      : "";
+    void main;
+  }
+  const b = await api("/api/backups").catch((e) => ({ error: e.message, items: [] }));
+  const last = b.last;
+  $("bkStatus").innerHTML = `저장 위치: <code>${esc(b.dir || "")}</code><br>` +
+    (last?.ok === false ? `<span class="err">마지막 백업 실패: ${esc(last.error || "")}</span>` : last?.at ? `마지막 백업: ${fmtTime(last.at)} (${esc(last.reason || "")})` : "아직 백업이 없어요. 매일 밤 9시 이후 자동으로 만들어요.");
+  const local = status?.local !== false;
+  $("bkList").innerHTML = (b.items || [])
+    .slice(0, 14)
+    .map((x) => `<li><span>${fmtTime(x.time)}${/되살리기전/.test(x.name) ? " · 되살리기 전 상태" : ""}</span><small>${fmtSize(x.size)}</small>${local ? `<button class="mini" data-restore="${esc(x.name)}">이 백업으로 되살리기</button>` : ""}</li>`)
+    .join("");
+}
+$("teamMode").onchange = async () => {
+  const on = $("teamMode").checked;
+  if (on && !confirm("사무실 다른 PC에서도 이 업무 도구를 쓰게 열까요?\n팀 비밀번호를 아는 사람만 들어올 수 있어요. 잠깐 다시 켜져요.")) return ($("teamMode").checked = !on);
+  try {
+    await api("/api/server", { method: "PUT", body: JSON.stringify({ server_mode: on }) });
+    $("teamMsg").textContent = "다시 켜는 중이에요... 몇 초 뒤 새로고침돼요";
+    setTimeout(() => location.reload(), 6000);
+  } catch (e) {
+    $("teamMode").checked = !on;
+    $("teamMsg").textContent = e.message;
+  }
+};
+$("teamPwBtn").onclick = async () => {
+  try {
+    await api("/api/server", { method: "PUT", body: JSON.stringify({ password: $("teamPw").value }) });
+    $("teamPw").value = "";
+    $("teamMsg").textContent = "팀 비밀번호를 정했어요. 다른 PC는 이 비밀번호로 들어와요.";
+    loadTeam();
+  } catch (e) {
+    $("teamMsg").textContent = e.message;
+  }
+};
+$("bkNow").onclick = async () => {
+  $("bkNow").disabled = true;
+  $("bkNow").textContent = "백업 중…";
+  try {
+    await api("/api/backups", { method: "POST" });
+  } catch (e) {
+    alert(e.message);
+  }
+  $("bkNow").disabled = false;
+  $("bkNow").textContent = "지금 백업하기";
+  loadTeam();
+};
+$("bkList").onclick = async (e) => {
+  const b = e.target.closest("[data-restore]");
+  if (!b) return;
+  if (!confirm("이 백업으로 되살릴까요?\n매출 통계 파일·설정·연결이 그때 상태로 돌아가요. 지금 상태는 따로 백업해 둬요.")) return;
+  b.disabled = true;
+  b.textContent = "되살리는 중…";
+  try {
+    const r = await api("/api/backups/restore", { method: "POST", body: JSON.stringify({ name: b.dataset.restore }) });
+    alert(`되살렸어요 (${r.restored}개 파일). 잠깐 다시 켜져요.`);
+    setTimeout(() => location.reload(), 6000);
+  } catch (er) {
+    alert(er.message);
+    loadTeam();
+  }
+};
+
+// ================= 지금 진행 중인 작업 (오른쪽 위) =================
+async function loadActivity() {
+  const r = await api("/api/activity").catch(() => null);
+  const items = r?.items || [];
+  const el = $("activity");
+  el.classList.toggle("hidden", !items.length);
+  el.textContent = `진행 중 ${items.length}`;
+  el.title = items.map((i) => `${i.kind} · ${i.label} ${i.what}`).join("\n");
+}
+$("activity").onclick = () => alert($("activity").title || "진행 중인 작업이 없어요");
+loadActivity();
+setInterval(loadActivity, 10000);
