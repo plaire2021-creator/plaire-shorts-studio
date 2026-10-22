@@ -129,8 +129,8 @@ window.addEventListener("focus", () => loadStatus(true));
 // ---------- 화면 전환 ----------
 const uploadMode = () => route.current === "upload"; // 제작된 숏츠 업로드 화면
 function show(ids) {
-  if (["shorts", "upload"].includes(route.current)) $("crumb").textContent = ids.includes("settings") ? "설정" : ids.includes("stepInput") ? (uploadMode() ? "새 업로드" : "새 영상") : current?.product_name || "영상";
-  $("settingsBtn").classList.toggle("on", ids.includes("settings"));
+  if (["shorts", "upload"].includes(route.current)) $("crumb").textContent = ids.includes("settings") ? "숏츠 설정" : ids.includes("stepInput") ? (uploadMode() ? "새 업로드" : "새 영상") : current?.product_name || "영상";
+  $("shortsSettingsBtn").classList.toggle("on", ids.includes("settings"));
   for (const s of ["stepInput", "stepProgress", "stepResult", "stepUpload", "settings"]) $(s).classList.toggle("hidden", !ids.includes(s));
   if (!ids.includes("stepInput")) $("activeJobs").classList.add("hidden");
   setTimeout(pauseHidden);
@@ -536,17 +536,18 @@ $("saveAdmin").onclick = async () => {
 async function openSettings() {
   clearInterval(poll);
   current = null;
-  loadTeam();
   if (status?.local !== false) await loadAdmin();
   show(["settings"]);
 }
-$("settingsBtn").onclick = () => (go("shorts"), openSettings());
+$("settingsBtn").onclick = () => go("settings"); // 업무 도구 전체 설정
+$("shortsSettingsBtn").onclick = () => openSettings(); // 숏츠 채널·앱 설정
 $("topNewBtn").onclick = newJob;
 $("home").onclick = (e) => (e.preventDefault(), go("home"));
 
 // ---------- 플레르 MS팀: 항목 이동 ----------
 const SECTIONS = {
   home: { title: "홈" },
+  settings: { title: "설정" },
   shorts: { title: "숏츠 제작 및 업로드" },
   upload: { title: "제작된 숏츠 업로드" },
   "weekly-sales": { title: "주간 매출 통계", desc: "채널별 주간 매출과 지난주 대비 변화를 봐요.", ico: "ico-bar" },
@@ -576,7 +577,10 @@ function route() {
   $("weeklyView").classList.toggle("hidden", name !== "weekly-sales");
   $("reviewView").classList.toggle("hidden", name !== "review-reply");
   $("monthlyView").classList.toggle("hidden", name !== "monthly-sales");
-  $("placeholderView").classList.toggle("hidden", isShorts || ["home", "weekly-sales", "review-reply", "monthly-sales"].includes(name));
+  $("settingsView").classList.toggle("hidden", name !== "settings");
+  $("settingsBtn").classList.toggle("on", name === "settings");
+  if (name === "settings") loadTeam();
+  $("placeholderView").classList.toggle("hidden", isShorts || ["home", "weekly-sales", "review-reply", "monthly-sales", "settings"].includes(name));
   if (name === "monthly-sales") monthlyOpen();
   if (name === "review-reply") reviewOpen();
   if (name === "weekly-sales") weeklyOpen();

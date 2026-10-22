@@ -11,9 +11,17 @@ const COOKIE = "plaire_team";
 const MAX_AGE = 180 * 24 * 3600; // 초
 
 export const serverMode = () => !!loadConfig().server_mode;
+// 서버 PC 자신인지: 127.0.0.1 뿐 아니라 이 PC의 사무실 주소(예: http://plairemstool → 192.168.0.114)로 열어도 서버 PC다
+const ownAddresses = () =>
+  new Set(
+    Object.values(os.networkInterfaces())
+      .flat()
+      .filter(Boolean)
+      .map((i) => i.address),
+  );
 export const isLocal = (req) => {
-  const a = String(req.socket?.remoteAddress || "");
-  return a === "127.0.0.1" || a === "::1" || a === "::ffff:127.0.0.1";
+  const a = String(req.socket?.remoteAddress || "").replace(/^::ffff:/, "");
+  return a === "127.0.0.1" || a === "::1" || ownAddresses().has(a);
 };
 
 // ---------- 비밀번호 ----------

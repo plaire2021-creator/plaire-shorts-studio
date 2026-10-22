@@ -415,3 +415,4 @@ body.remote .local-only{display:none!important}
 .activity::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-right:6px;vertical-align:1px;animation:pulse 1.4s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){.activity::before{animation:none}}
+.team-box.plain{margin:0;border:0;padding:0;background:none}
