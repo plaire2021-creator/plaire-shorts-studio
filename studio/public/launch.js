@@ -274,16 +274,12 @@ let expOpen = null;
 const GO_TAG = {진행:'green', 검토중:'amber', 미진행:''};
 function expCard(x, xi){
   const go = goOf(x), tot = x.steps.length, d = x.steps.filter(a=>a.st==='완료'||a.st==='보류').length;
-  const po = posts(x), late = xOn(x) && x.steps.some(a=>xLate(x,a));
+  const po = posts(x);
   const r = tot ? {a:addD(x.start,Math.min(...x.steps.map(a=>a.s))), b:addD(x.start,Math.max(...x.steps.map(a=>a.e)))} : null;
-  const nx = x.steps.find(a=>a.st!=='완료'&&a.st!=='보류');
-  const next = go==='검토중' ? '<span class="note">진행할지 정해 주세요</span>' : go==='미진행' ? '<span class="note">이번 제품은 진행 안 함</span>'
-    : !tot ? '<span class="note">진행 상황을 추가해 주세요</span>' : nx ? `다음 · ${esc(nx.name||'(이름 없음)')} <span class="${xLate(x,nx)?'bad':'note'}">~${md(xEnd(x,nx))}${xLate(x,nx)?' 지남':''}</span>` : '<span class="note">모두 끝났어요</span>';
   return `<button class="xc ${expOpen===x.key?'on':''} ${go==='미진행'?'off':''}" data-xopen="${x.key}">
     <span class="xc-top"><b>${esc(x.name)}</b><span class="note">${esc(x.ch)}</span><span class="tag ${GO_TAG[go]}">${go}</span></span>
     <span class="xc-bar"><span class="bar"><i style="width:${pct(d,tot)}%"></i></span><span class="note">${tot?d+'/'+tot:'진행 상황 없음'}</span></span>
-    <span class="xc-meta"><span>인원 ${x.target}명 · 게시 ${po}건</span><span class="note">${r?md(r.a)+' ~ '+md(r.b):''}</span></span>
-    <span class="xc-next ${late?'late':''}">${next}</span></button>`;
+    <span class="xc-meta"><span>인원 ${x.target}명 · 게시 ${po}건</span><span class="note">${r?md(r.a)+' ~ '+md(r.b):''}</span></span></button>`;
 }
 function vExp(){
   // 미진행도 자리는 그대로 두고 카드만 흑백으로
