@@ -419,3 +419,9 @@
 @media (max-width:900px){#launchView .td-row input.td-link{width:160px}}
 #launchView .prodform input.need{border-color:var(--amber);background:var(--amber-soft)}
 #launchView .li-need.on{color:var(--amber);font-weight:600}
+/* 보류 = 빨강 */
+#launchView .st-보류{background:var(--red-soft);color:var(--red)}
+#launchView .stp.s-보류{background:var(--red-soft);color:var(--red)}
+#launchView .s-보류 .ds-no{color:var(--red)}
+#launchView .hold-t{border:0;font:inherit;font-size:11.5px;font-weight:600;cursor:pointer;flex:none}
+#launchView .hold-t:hover{box-shadow:0 0 0 1px var(--red)}

@@ -56,7 +56,7 @@ export function list() {
         const open = s.checklists.flatMap((c) => c.items.filter((i) => i.st !== "완료" && i.st !== "보류").map((i) => ({ ...i, ch: c.name })));
         const nx = open.sort((a, b) => a.e - b.e || a.s - b.s || (a.step || 99) - (b.step || 99))[0]; // 마감이 가장 가까운 업무
         const next = nx ? `${nx.ch} ${String(nx.name).replace(/^\s*\[\d+\]\s*/, "")}` : "";
-        return { id: f.slice(0, -5), name: s.product.name, brand: s.product.brand || s.product.sheet?.matches?.[0]?.brand || "", launch: s.product.launch, team: s.product.team, done: items.filter((i) => i.st === "완료").length, total: items.length, late, next, saved_at: saved_at || created_at };
+        return { id: f.slice(0, -5), name: s.product.name, brand: s.product.brand || s.product.sheet?.matches?.[0]?.brand || "", launch: s.product.launch, team: s.product.team, done: items.filter((i) => i.st === "완료" || i.st === "보류").length, total: items.length, late, next, saved_at: saved_at || created_at };
       } catch {
         return null;
       }

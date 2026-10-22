@@ -59,7 +59,7 @@ const EXPN = () => S.steps.findIndex(n=>n.includes('체험단'))+1 || -1;
 const weeklyStep = n => /체크/.test(S.steps[n-1]||'');
 function stepRange(n){ const ts=stepTasks(n); if(!ts.length) return null; return {s:Math.min(...ts.map(t=>t.s)), e:Math.max(...ts.map(t=>t.e))}; }
 function stepStatus(n){ const ts=stepTasks(n); if(!ts.length) return '대기';
-  if(ts.every(t=>t.st==='완료')) return '완료'; if(ts.some(isLate)) return '지연'; if(ts.some(t=>t.st==='진행중'||t.st==='완료')) return '진행중'; if(ts.every(t=>t.st==='보류')) return '보류'; return '대기'; }
+  if(ts.every(t=>t.st==='완료')) return '완료'; if(ts.every(t=>t.st==='완료'||t.st==='보류')) return ts.some(t=>t.st==='완료') ? '완료' : '보류'; if(ts.some(isLate)) return '지연'; if(ts.some(t=>t.st==='진행중'||t.st==='완료'||t.st==='보류')) return '진행중'; if(ts.every(t=>t.st==='보류')) return '보류'; return '대기'; }
 const EXPST = ['대기','진행중','완료','보류'];
 const PST = ['섭외중','확정','발송완료','게시완료','취소'];
 const xStart = (x,st) => addD(x.start, st.s);
@@ -190,14 +190,15 @@ function vDash(){
   const stepSt = n => n===EXPN() ? expStepStatus() : stepStatus(n);
   const doneSteps = S.steps.filter((_,i)=>stepSt(i+1)==='완료').length;
   // 위쪽: 업무 진행 카드 + 상태별로 나눈 진행도 막대
-  const ing = T.filter(t=>t.st==='진행중' && !isLate(t)).length, hold = T.filter(t=>t.st==='보류').length, wait = T.length - done - ing - late - hold, p = pct(done,T.length);
+  // 보류는 완료와 똑같이 진행도에 넣는다 (지연은 따로 나누지 않음)
+  const ing = T.filter(t=>t.st==='진행중').length, hold = T.filter(t=>t.st==='보류').length, closed = done + hold, wait = T.length - closed - ing, p = pct(closed,T.length);
   const seg = (c,k) => k ? `<span class="${c}" style="width:${k/T.length*100}%" title="${k}건"></span>` : '';
-  let h = `<div class="ds-sum"><div class="tile"><div class="k">업무 진행</div><div class="v">${p}%</div><div class="s">완료 ${done} / ${T.length}건</div></div>
-  <div class="tile dm"><div class="dm-head"><span class="k">업무 진행도</span><b>${p}%</b><span class="s">${T.length-done}건 남음</span></div>
-  <div class="dm-bar">${seg('ok',done)}${seg('ing',ing)}${seg('bad',late)}${seg('hold',hold)}</div>
+  let h = `<div class="ds-sum"><div class="tile"><div class="k">업무 진행</div><div class="v">${p}%</div><div class="s">완료 ${done}${hold?` · 보류 ${hold}`:''} / ${T.length}건</div></div>
+  <div class="tile dm"><div class="dm-head"><span class="k">업무 진행도</span><b>${p}%</b><span class="s">${T.length-closed}건 남음</span></div>
+  <div class="dm-bar">${seg('ok',done)}${seg('bad',hold)}${seg('ing',ing)}</div>
   <div class="dm-scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100%</span></div>
-  <div class="dm-lg"><span><i class="ok"></i>완료 ${done}</span><span><i class="ing"></i>진행중 ${ing}</span><span><i class="bad"></i>지연 ${late}</span>${hold?`<span><i class="hold"></i>보류 ${hold}</span>`:''}<span><i></i>대기 ${wait}</span></div></div></div>`;
-  h += `<div class="panel ds-main"><div class="ds-head"><h3>${S.steps.length}단계 진행</h3><span class="note">완료 ${doneSteps} / ${S.steps.length}단계 · 업무 ${done} / ${T.length}건${late?` · <b class="bad">지연 ${late}건</b>`:''} · 단계를 누르면 업무가 펼쳐져요</span></div><div class="ds-list">`;
+  <div class="dm-lg"><span><i class="ok"></i>완료 ${done}</span><span><i class="bad"></i>보류 ${hold}</span><span><i class="ing"></i>진행중 ${ing}</span><span><i></i>대기 ${wait}</span></div></div></div>`;
+  h += `<div class="panel ds-main"><div class="ds-head"><h3>${S.steps.length}단계 진행</h3><span class="note">완료 ${doneSteps} / ${S.steps.length}단계 · 업무 ${closed} / ${T.length}건${late?` · <b class="bad">지연 ${late}건</b>`:''} · 단계를 누르면 업무가 펼쳐져요</span></div><div class="ds-list">`;
   S.steps.forEach((nm,i)=>{
     const n = i+1, st = stepSt(n), open = openSt.has(n);
     let d, tot, rng, chans, owners, body = '';
@@ -211,8 +212,8 @@ function vDash(){
         + `<div class="ds-foot"><button class="btn small" data-goexp="all">체험단 탭에서 관리</button></div>`;
     } else {
       const ts = stepTasks(n), r = stepRange(n);
-      d = ts.filter(t=>t.st==='완료').length; tot = ts.length; rng = r ? md(addD(S.product.launch,r.s))+' ~ '+md(addD(S.product.launch,r.e)) : '업무 없음';
-      chans = ts.map(t=>`<span class="ds-ch ${t.st==='완료'?'on':isLate(t)?'bad':''}" title="${esc(t.ch)} · ${esc(t.owner||'담당 미정')}">${t.st==='완료'?'✓ ':''}${esc(bare(t.name))}</span>`).join('');
+      d = ts.filter(t=>t.st==='완료'||t.st==='보류').length; tot = ts.length; rng = r ? md(addD(S.product.launch,r.s))+' ~ '+md(addD(S.product.launch,r.e)) : '업무 없음';
+      chans = ts.map(t=>`<span class="ds-ch ${t.st==='완료'?'on':(t.st==='보류'||isLate(t))?'bad':''}" title="${esc(t.ch)} · ${esc(t.owner||'담당 미정')}${t.st==='보류'?' · 보류':''}">${t.st==='완료'?'✓ ':t.st==='보류'?'보류 · ':''}${esc(bare(t.name))}</span>`).join('');
       owners = [...new Set(ts.map(t=>t.owner).filter(Boolean))];
       const sheetOnly = ts.length && ts.every(t=>bySheet(t));
       if(open && sheetOnly){
@@ -220,8 +221,8 @@ function vDash(){
         body = `<div class="reg-list">${ts.map(t=>`<span class="reg ${t.st==='완료'?'on':''}">${t.st==='완료'?'✓':'○'} ${esc(bare(t.name).replace(/\s*상품등록$/,''))}</span>`).join('')}</div>
           <p class="reg-note">${S.product.code ? `구글 시트 「상품등록 현황」에 등록(O)하면 자동으로 체크돼요.${at?' · '+at:''} <button class="linkbtn" id="lnLookup">지금 확인</button>` : '제품 정보에 상품 코드를 넣으면 구글 시트 「상품등록 현황」을 보고 자동으로 체크돼요.'}</p>`;
       } else if(open) body = ts.map(t=>{ const lt = isLate(t), s2 = lt ? '지연' : t.st;
-        if(contentStep(n)) return `<div class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)} · ${esc(t.owner||'담당 미정')}</small></span>${lt?`<span class="td-d bad">${dnum(TODAY)-t.e}일 지남</span>`:''}<span class="td-linkbox">${t.url?`<a class="td-open" href="${esc(t.url)}" target="_blank" rel="noopener" title="${esc(t.url)}">열기 ↗</a>`:''}<input class="td-link" type="url" id="lk-${t._ci}-${t._ii}" data-lnk="${t._ci}-${t._ii}" value="${esc(t.url||'')}" placeholder="게시물 링크 붙여넣기" aria-label="${esc(bare(t.name))} 링크"></span><span class="pill st-${s2}">${s2}</span></div>`;
-        return `<label class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)} · ${esc(t.owner||'담당 미정')}${t.rec==='weekly'?' · 매주 월요일':''}</small></span>${lt?`<span class="td-d bad">${dnum(TODAY)-t.e}일 지남</span>`:''}<span class="pill st-${s2}">${s2}</span></label>`; }).join('')
+        if(contentStep(n)) return `<div class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)} · ${esc(t.owner||'담당 미정')}</small></span>${lt?`<span class="td-d bad">${dnum(TODAY)-t.e}일 지남</span>`:''}<span class="td-linkbox">${t.url?`<a class="td-open" href="${esc(t.url)}" target="_blank" rel="noopener" title="${esc(t.url)}">열기 ↗</a>`:''}<input class="td-link" type="url" id="lk-${t._ci}-${t._ii}" data-lnk="${t._ci}-${t._ii}" value="${esc(t.url||'')}" placeholder="게시물 링크 붙여넣기" aria-label="${esc(bare(t.name))} 링크"></span><button class="pill st-${s2} hold-t" data-hold="${t._ci}-${t._ii}" title="${t.st==='보류'?'누르면 보류를 풀어요':'누르면 보류로 바꿔요'}">${s2}</button></div>`;
+        return `<label class="td-row"><input type="checkbox" id="ck-${t._ci}-${t._ii}" data-ck="${t._ci}-${t._ii}" ${t.st==='완료'?'checked':''} aria-label="완료"><span class="td-t">${esc(bare(t.name))}<small>${esc(t.ch)} · ${esc(t.owner||'담당 미정')}${t.rec==='weekly'?' · 매주 월요일':''}</small></span>${lt?`<span class="td-d bad">${dnum(TODAY)-t.e}일 지남</span>`:''}<button class="pill st-${s2} hold-t" data-hold="${t._ci}-${t._ii}" title="${t.st==='보류'?'누르면 보류를 풀어요':'누르면 보류로 바꿔요'}">${s2}</button></label>`; }).join('')
         + toolLinks(nm);
     }
     h += `<div class="ds-row s-${st} ${open?'open':''}"><button class="ds-top" data-dsopen="${n}" aria-expanded="${open}"><span class="ds-no">${stepNo(n)}</span><span class="ds-nm">${esc(nm)}<small>${rng}${owners.length?' · '+owners.map(esc).join(', '):''}</small></span><span class="ds-chs">${chans}</span><span class="ds-prog"><span class="bar"><i style="width:${pct(d,tot)}%"></i></span><em>${d}/${tot}</em></span><span class="pill st-${st}">${st}</span><span class="ds-caret" aria-hidden="true">${open?'▴':'▾'}</span></button>${open?`<div class="ds-body">${body}</div>`:''}</div>`;
@@ -566,6 +567,10 @@ document.addEventListener('click', e=>{
   if(b.id==='lnLookup'){ lookupCode(); return; }
   if(b.dataset.wmode){ workMode=b.dataset.wmode; editPeriod=-1; openCol=null; render(); return; }
   if(b.dataset.gmode){ goalMode=b.dataset.gmode; render(); return; }
+  if(b.dataset.hold){ const [ci,ii]=b.dataset.hold.split('-').map(Number), it=S.checklists[ci].items[ii];
+    if(it.st==='보류') it.st = (it._prev && it._prev!=='보류') ? it._prev : (it.url ? '완료' : '대기');
+    else { defp(it,'_prev',it.st); it.st='보류'; }
+    markDirty(); render(); return; }
   if(b.dataset.dsopen){ const n=+b.dataset.dsopen; openSt.has(n)?openSt.delete(n):openSt.add(n); render(); return; }
   if(b.dataset.goperf){ tab='gp'; goalMode='perf'; perfCp=b.dataset.goperf; render(); window.scrollTo(0,0); return; }
   if(b.dataset.gostep){ const n=+b.dataset.gostep; if(n===EXPN()){ tab='exp'; expSel='all'; } else { tab='work'; workMode='prog'; CF={step:[stepNo(n)+' '+stepName(n)]}; } render(); return; }
