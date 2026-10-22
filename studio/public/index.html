@@ -411,7 +411,10 @@
             <strong id="videoText">영상 파일을 여기에 놓으세요</strong>
             <span class="pick-row"><button type="button" class="pick" data-pick="videoFile">파일 고르기</button></span>
           </div>
-          <video class="video-preview hidden" id="videoPreview" muted playsinline controls></video>
+          <div class="thumbs hidden" id="videoThumbs">
+            <video class="video-preview" id="videoPreview" muted playsinline controls></video>
+            <button type="button" class="mini" id="videoClear">비우기</button>
+          </div>
         </div>
 
         <p class="err" id="copyErr"></p>

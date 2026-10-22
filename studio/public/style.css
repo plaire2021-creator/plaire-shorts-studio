@@ -440,5 +440,6 @@ body.remote .local-only{display:none!important}
 .bl-topic{resize:vertical;min-height:52px;font:inherit;line-height:1.5}
 .bl-topic-help{margin:0}
 .thumbs{margin-top:8px}
+#videoThumbs{align-items:flex-end}
 .thumbs[data-kind=photo] img{width:56px;height:56px;object-position:center}
 .zip-chip{display:inline-flex;align-items:center;height:30px;padding:0 12px;border:1px solid var(--line);border-radius:6px;font-size:13px}

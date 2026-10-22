@@ -393,11 +393,12 @@ function setCopyVideo(f) {
   if (pv.src) URL.revokeObjectURL(pv.src);
   if (f) pv.src = URL.createObjectURL(f);
   else pv.removeAttribute("src");
-  pv.classList.toggle("hidden", !f);
+  $("videoThumbs").classList.toggle("hidden", !f);
   $("videoText").textContent = f ? `${f.name} (${(f.size / 1e6).toFixed(0)}MB)` : "영상 파일을 여기에 놓으세요";
   $("videoDrop").classList.toggle("picked", !!f);
   $("videoFile").value = "";
 }
+$("videoClear").onclick = () => setCopyVideo(null);
 function resetCopyInput() {
   $("copyName").value = "";
   $("copyErr").textContent = "";
