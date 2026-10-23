@@ -114,14 +114,17 @@ export function patchItem(id, { item, done, link }) {
 }
 
 // 휴가 하루 바꾸기: kind = '연차' | '반차' | '' (지우기). 날짜를 하나라도 고르면 엑셀에서 온 '날짜 미정' 표시는 지운다
-export function setLeave(id, { name, date, kind }) {
+export function setLeave(id, { name, date, dates, kind }) {
   const p = load(id);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) throw new Error("날짜가 올바르지 않아요");
+  const ds = (Array.isArray(dates) ? dates : [date]).map(String).slice(0, 31); // 여러 날(기간)을 한 번에
+  if (!ds.length || !ds.every((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))) throw new Error("날짜가 올바르지 않아요");
   let l = p.leave.find((x) => x.name === name);
   if (!l) p.leave.push((l = { name: String(name).slice(0, 10), days: {}, note: "" }));
   l.days = l.days || {};
-  if (kind === "연차" || kind === "반차") l.days[date] = kind;
-  else delete l.days[date];
+  for (const d of ds) {
+    if (kind === "연차" || kind === "반차") l.days[d] = kind;
+    else delete l.days[d];
+  }
   l.note = "";
   write(p);
   return p.leave;

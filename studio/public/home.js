@@ -57,12 +57,22 @@
   function leaveLine() {
     const days = weekDays(), chips = [];
     for (const l of cur.leave) {
-      for (const d of Object.keys(l.days || {}).sort()) chips.push(`<span class="hp-lchip ${l.days[d] === "반차" ? "half" : ""}">${esc(l.name)} ${md(d)} ${esc(l.days[d])}<button data-lvdel="${esc(l.name)}|${d}" aria-label="${esc(l.name)} ${md(d)} 휴가 지우기">✕</button></span>`);
+      const ds = Object.keys(l.days || {}).sort(), runs = [];
+      for (const d of ds) {
+        const r = runs[runs.length - 1], i = days.indexOf(d);
+        if (r && r.kind === l.days[d] && i >= 0 && days.indexOf(r.to) === i - 1) r.to = d;
+        else runs.push({ from: d, to: d, kind: l.days[d] });
+      }
+      for (const r of runs) {
+        const span = days.slice(days.indexOf(r.from), days.indexOf(r.to) + 1);
+        const all = span.length ? span : [r.from];
+        chips.push(`<span class="hp-lchip ${r.kind === "반차" ? "half" : ""}">${esc(l.name)} ${md(r.from)}${r.to !== r.from ? "~" + md(r.to) : ""} ${esc(r.kind)}<button data-lvdel="${esc(l.name)}|${all.join(",")}" aria-label="${esc(l.name)} 휴가 지우기">✕</button></span>`);
+      }
       if (l.note && !Object.keys(l.days || {}).length) chips.push(`<button class="hp-lchip todo" data-lvpick="${esc(l.name)}" title="눌러서 날짜를 정해 주세요">${esc(l.name)} ${esc(l.note)} · 날짜 미정</button>`);
     }
     const f = lvForm;
     return `<div class="hp-lline"><span class="hp-lh">휴가</span>${chips.join("") || '<span class="muted">이번 주 휴가 없음</span>'}
-      ${f ? `<span class="hp-lform"><select data-lvf="name">${cur.leave.map((l) => `<option ${l.name === f.name ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select><select data-lvf="date">${days.map((d) => `<option value="${d}" ${d === f.date ? "selected" : ""}>${md(d)}</option>`).join("")}</select><select data-lvf="kind"><option ${f.kind === "연차" ? "selected" : ""}>연차</option><option ${f.kind === "반차" ? "selected" : ""}>반차</option></select><button class="hp-lk" id="lvAdd">추가</button><button class="hp-lk" id="lvCancel">취소</button></span>`
+      ${f ? `<span class="hp-lform"><select data-lvf="name">${cur.leave.map((l) => `<option ${l.name === f.name ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select><select data-lvf="date">${days.map((d) => `<option value="${d}" ${d === f.date ? "selected" : ""}>${md(d)}</option>`).join("")}</select><span class="muted">~</span><select data-lvf="to">${days.filter((d) => d >= f.date).map((d) => `<option value="${d}" ${d === (f.to && f.to >= f.date ? f.to : f.date) ? "selected" : ""}>${md(d)}</option>`).join("")}</select><select data-lvf="kind"><option ${f.kind === "연차" ? "selected" : ""}>연차</option><option ${f.kind === "반차" ? "selected" : ""}>반차</option></select><button class="hp-lk" id="lvAdd">추가</button><button class="hp-lk" id="lvCancel">취소</button></span>`
         : `<button class="hp-lk" id="lvOpen">+ 휴가</button>`}</div>`;
   }
   function render() {
@@ -126,9 +136,11 @@
     if (pick) { lvForm = { name: pick.dataset.lvpick, date: weekDays()[0], kind: cur.leave.find((l) => l.name === pick.dataset.lvpick)?.note === "반차" ? "반차" : "연차" }; return render(); }
     const add = e.target.closest("#lvAdd"), del = e.target.closest("[data-lvdel]");
     if (add || del) {
-      const [name, date, kind] = add ? [lvForm.name, lvForm.date, lvForm.kind] : [...del.dataset.lvdel.split("|"), ""];
+      let name, dates, kind;
+      if (add) { const ds = weekDays(), to = lvForm.to && lvForm.to >= lvForm.date ? lvForm.to : lvForm.date; [name, kind] = [lvForm.name, lvForm.kind]; dates = ds.filter((d) => d >= lvForm.date && d <= to); }
+      else { const [n, list] = del.dataset.lvdel.split("|"); [name, dates, kind] = [n, list.split(","), ""]; }
       lvForm = null;
-      try { cur.leave = await getJSON(`/api/plans/${cur.id}/leave`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, date, kind }) }); }
+      try { cur.leave = await getJSON(`/api/plans/${cur.id}/leave`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, dates, kind }) }); }
       catch (er) { alert(er.message); }
       return render();
     }
@@ -138,7 +150,7 @@
     if (el.id === "hpFile") return upload(el.files[0]);
     if (el.id === "hpWeek") { cur = await getJSON("/api/plans/" + el.value); editing = null; return render(); }
     if (el.dataset.done) return patch(el.dataset.done, { done: el.checked });
-    if (el.dataset.lvf && lvForm) lvForm[el.dataset.lvf] = el.value;
+    if (el.dataset.lvf && lvForm) { lvForm[el.dataset.lvf] = el.value; if (el.dataset.lvf === "date") render(); }
   });
   H?.addEventListener("keydown", (e) => {
     if (e.target.dataset?.link && e.key === "Enter" && !e.isComposing) { e.preventDefault(); saveLink(e.target); }
