@@ -23,6 +23,7 @@ import * as launch from "./lib/launch.js";
 import * as plans from "./lib/plans.js";
 import * as goals from "./lib/goals.js";
 import * as promos from "./lib/promos.js";
+import * as events from "./lib/events.js";
 
 const PORT = Number(process.env.PORT || loadConfig().port || 4173);
 tiktok.setPort(PORT);
@@ -301,6 +302,29 @@ const blogView = (r) => {
   if (r.status === "running" && !live && !alive(r.server_pid)) return { ...r, status: "failed", error: "스튜디오가 꺼져서 중단됐어요. 다시 넣어 주세요" };
   return { ...r, running: live || (r.status === "running" && alive(r.server_pid)) };
 };
+// ---------- 홈 캘린더: 직접 넣는 일정 ----------
+app.get("/api/events", (req, res) => res.json({ items: events.list() }));
+app.post("/api/events", (req, res) => {
+  try {
+    res.json(events.create(req.body));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+app.patch("/api/events/:id", (req, res) => {
+  try {
+    res.json(events.update(req.params.id, req.body));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+app.delete("/api/events/:id", (req, res) => {
+  try {
+    res.json(events.remove(req.params.id));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
 // ---------- 기획전 관리 ----------
 app.get("/api/promos", (req, res) => res.json({ channels: promos.CHANNELS, statuses: promos.STATUSES, members: ["MS팀", ...plans.MEMBERS], items: promos.list() }));
 app.post("/api/promos", (req, res) => {
