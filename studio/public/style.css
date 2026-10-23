@@ -446,3 +446,13 @@ body.remote .local-only{display:none!important}
 .thumbs[data-kind=photo] img{width:56px;height:56px;object-position:center}
 .zip-chip{display:inline-flex;align-items:center;height:30px;padding:0 12px;border:1px solid var(--line);border-radius:6px;font-size:13px}
 .active-empty{margin:0;padding:12px 14px;border-radius:8px;background:var(--card);font-size:13px;color:var(--faint)}
+/* 생성 중 표시 (리뷰 답글 등) */
+.gen-load{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:12px;background:var(--blue-soft);margin-bottom:10px}
+.gen-load b{display:block;font-size:15px;color:var(--blue)}
+.gen-load .muted{display:block;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:560px}
+.gen-spin{width:30px;height:30px;border-radius:50%;border:3px solid #cdd9fb;border-top-color:var(--blue);animation:gen-spin .9s linear infinite;flex:none}
+.gen-bar{height:4px;border-radius:2px;background:var(--bg);overflow:hidden;margin-bottom:12px}
+.gen-bar i{display:block;width:35%;height:100%;border-radius:2px;background:var(--blue);animation:gen-slide 1.6s ease-in-out infinite}
+@keyframes gen-spin{to{transform:rotate(360deg)}}
+@keyframes gen-slide{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
+@media (prefers-reduced-motion:reduce){.gen-spin,.gen-bar i{animation-duration:3s}}

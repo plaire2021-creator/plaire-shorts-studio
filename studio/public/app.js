@@ -969,6 +969,8 @@ function rvRender() {
     $("rvElapsed").textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
     $("rvLowBox1").innerHTML = rvLowBox(r);
     $("rvLog").innerHTML = (r.log || []).slice(-40).map((l) => `<li>${esc(l)}</li>`).join("");
+    const last = (r.log || []).filter((l) => !/^·/.test(l)).slice(-1)[0];
+    if (last) $("rvNow").textContent = last.slice(0, 80);
     return;
   }
   $("rvProgress").classList.add("hidden");
@@ -1014,11 +1016,31 @@ async function rvLoadCards(id) {
     })
     .join("");
 }
+// 복사: http://plairemstool 처럼 https가 아닌 주소에서는 브라우저가 navigator.clipboard를 막아서 예전 방식(execCommand)으로도 복사한다
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) return await navigator.clipboard.writeText(text);
+  } catch {}
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+  document.body.appendChild(ta);
+  ta.select();
+  ta.setSelectionRange(0, text.length);
+  const ok = document.execCommand("copy");
+  ta.remove();
+  if (!ok) throw new Error("copy");
+}
 $("rvCards").onclick = async (e) => {
   const b = e.target.closest("[data-copy]");
   if (b) {
-    await navigator.clipboard.writeText($(b.dataset.copy).textContent);
-    b.textContent = "복사됨";
+    try {
+      await copyText($(b.dataset.copy).textContent);
+      b.textContent = "복사됨";
+    } catch {
+      b.textContent = "복사 안 됨";
+    }
     b.classList.add("done");
     setTimeout(() => ((b.textContent = "복사"), b.classList.remove("done")), 1500);
     return;
@@ -1502,9 +1524,13 @@ function blRender() {
 $("blResult").onclick = async (e) => {
   const b = e.target.closest("[data-blcopy]");
   if (!b) return;
-  await navigator.clipboard.writeText($(b.dataset.blcopy).textContent);
   const t = b.textContent;
-  b.textContent = "복사됨";
+  try {
+    await copyText($(b.dataset.blcopy).textContent);
+    b.textContent = "복사됨";
+  } catch {
+    b.textContent = "복사 안 됨";
+  }
   setTimeout(() => (b.textContent = t), 1500);
 };
 function blHistory(runs) {
