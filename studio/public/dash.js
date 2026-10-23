@@ -18,6 +18,11 @@
     if (!r.ok) throw new Error(j.error || "서버에 연결하지 못했어요");
     return j;
   }
+  // 오늘 리뷰: '리뷰 답글 작성 도우미'에 오늘 넣은 스마트스토어 리뷰 엑셀 기록(브랜드별, 같은 파일은 한 번만)
+  let revs = null;
+  async function loadReviews() {
+    try { revs = await getJSON("/api/reviews/runs"); } catch { revs = []; }
+  }
   async function loadPlan() {
     try {
       const r = await getJSON("/api/plans");
@@ -32,12 +37,12 @@
     catch (e) { goals = { month, error: e.message, targets: {}, actual: {}, through: {}, channels: [] }; }
   }
   window.homeDashOpen = async function () {
-    await Promise.all([loadPlan(), loadGoals()]);
+    await Promise.all([loadPlan(), loadGoals(), loadReviews()]);
     render();
     clearInterval(timer);
     timer = setInterval(async () => {
       if (D.closest(".hidden") || editing) return;
-      await loadPlan();
+      await Promise.all([loadPlan(), loadReviews()]);
       render();
     }, 30000);
   };
@@ -68,6 +73,29 @@
           ${off.length ? `<div class="hd-off">오늘 휴가 · ${off.map(esc).join(", ")}</div>` : ""}
         </div>
       </div>
+    </section>`;
+  }
+
+  // ---------- 오늘 리뷰 ----------
+  function reviewCard() {
+    const today = iso(new Date());
+    const runs = (revs || []).filter((r) => r.started_at && iso(new Date(r.started_at)) === today);
+    const panel = (brand) => {
+      const seen = new Map();
+      for (const r of runs.filter((r) => r.brand === brand)) {
+        const k = r.source || r.id, o = seen.get(k);
+        if (!o || (o.status !== "done" && r.status === "done")) seen.set(k, r);
+      }
+      const list = [...seen.values()];
+      if (!list.length) return `<div class="hd-rv none"><span class="hd-rv-b"><i class="dot ${brand === "플레르가구" ? "pl" : "gz"}"></i>${BR[brand]}</span><b>-</b><span class="hd-rv-s">아직 확인 전</span></div>`;
+      const total = list.reduce((s, r) => s + (r.total || 0), 0), low = list.reduce((s, r) => s + (r.low || 0), 0);
+      const busy = list.some((r) => r.running), done = list.every((r) => r.status === "done");
+      return `<div class="hd-rv"><span class="hd-rv-b"><i class="dot ${brand === "플레르가구" ? "pl" : "gz"}"></i>${BR[brand]}</span><b>${total}<small>건</small></b>
+        <span class="hd-rv-s">${low ? `<em class="low">5점 미만 ${low}건</em>` : "모두 5점"} · ${busy ? "답글 쓰는 중" : done ? "답글 완료" : "답글 미완료"}</span></div>`;
+    };
+    return `<section class="card hd-card">
+      <div class="hd-head"><h2>오늘 리뷰</h2><span class="muted">${md(today)} 스마트스토어</span><a class="hd-more" href="#/review-reply">리뷰 답글 열기</a></div>
+      <div class="hd-rvs">${panel("플레르가구")}${panel("가즈다가구")}</div>
     </section>`;
   }
 
@@ -112,7 +140,7 @@
   function render() {
     const t = new Date();
     D.innerHTML = `<div class="hd-top"><img class="home-logo" src="img/plaire-logo.png" alt="PLAIRE FURNITURE"><span class="muted">${t.getMonth() + 1}월 ${t.getDate()}일 ${WD[t.getDay()]}요일</span></div>
-      ${planCard()}${goals ? goalCard() : ""}`;
+      <div class="hd-row">${planCard()}${reviewCard()}</div>${goals ? goalCard() : ""}`;
   }
 
   D.addEventListener("click", async (e) => {

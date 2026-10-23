@@ -583,3 +583,13 @@ body.remote .local-only{display:none!important}
 .hd-eact .btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
 .hd-load{margin:0}
 @media (max-width:860px){.hd-brands{grid-template-columns:1fr}.hd-cat{grid-template-columns:110px 1fr 44px}}
+.hd-row{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.hd-rvs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hd-rv{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:6px}
+.hd-rv-b{font-size:13px;font-weight:700}
+.hd-rv>b{font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1.1}
+.hd-rv>b small{font-size:.5em;font-weight:700;color:var(--sub);margin-left:2px}
+.hd-rv-s{font-size:12px;color:var(--sub)}
+.hd-rv-s .low{font-style:normal;color:var(--red);font-weight:700}
+.hd-rv.none>b{color:var(--faint)}
+@media (max-width:860px){.hd-row{grid-template-columns:1fr}}
