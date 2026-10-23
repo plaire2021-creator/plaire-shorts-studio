@@ -27,6 +27,7 @@
 
       <div class="nav-label">업무 관리</div>
       <a class="nav-item" href="#/plan" data-route="plan"><span class="ico ico-todo"></span>주간 업무</a>
+      <a class="nav-item" href="#/promo" data-route="promo"><span class="ico ico-cal"></span>기획전 관리</a>
       <a class="nav-item" href="#/launch" data-route="launch"><span class="ico ico-flag"></span>신제품 출시 매뉴얼</a>
 
       <div class="nav-label">콘텐츠 제작</div>
@@ -77,6 +78,9 @@
     <div class="content hidden" id="planView">
       <div id="homeBoard" class="home-board"></div>
     </div>
+
+    <!-- 기획전 관리 (내용은 promo.js가 그린다) -->
+    <div class="content hidden" id="promoView"></div>
 
     <!-- 준비 중인 항목 -->
     <div class="content hidden" id="placeholderView">
@@ -503,6 +507,7 @@
 <script src="app.js"></script>
 <script src="launch.js"></script>
 <script src="home.js"></script>
+<script src="promo.js"></script>
 <script src="dash.js"></script>
 </body>
 </html>

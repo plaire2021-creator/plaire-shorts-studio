@@ -573,6 +573,7 @@ const SECTIONS = {
   "monthly-sales": { title: "월간 매출 통계", desc: "채널별 월간 매출과 전월 대비 변화를 봐요.", ico: "ico-cal" },
   reviews: { title: "제품 리뷰수 종합", desc: "채널별 제품 리뷰 수를 한곳에 모아 봐요.", ico: "ico-star" },
   plan: { title: "주간 업무" },
+  promo: { title: "기획전 관리" },
   launch: { title: "신제품 출시 매뉴얼" },
   blog: { title: "블로그 작성 도우미", desc: "제품 자료로 블로그 글과 이미지를 준비해요.", ico: "ico-pen" },
   "review-reply": { title: "리뷰 답글 작성 도우미", desc: "고객 리뷰에 맞는 답글을 빠르게 써요.", ico: "ico-chat" },
@@ -597,6 +598,8 @@ function route() {
   $("planView").classList.toggle("hidden", name !== "plan");
   if (name === "plan") window.homeOpen?.();
   if (name === "home") window.homeDashOpen?.();
+  $("promoView").classList.toggle("hidden", name !== "promo");
+  if (name === "promo") window.promoOpen?.();
   $("shortsView").classList.toggle("hidden", !isShorts);
   $("weeklyView").classList.toggle("hidden", name !== "weekly-sales");
   $("reviewView").classList.toggle("hidden", name !== "review-reply");
@@ -609,7 +612,7 @@ function route() {
   $("settingsBtn").classList.toggle("hidden", !["home", "settings", "shorts", "upload"].includes(name));
   $("settingsBtn").classList.toggle("on", name === "settings");
   if (name === "settings") loadTeam();
-  $("placeholderView").classList.toggle("hidden", isShorts || ["home", "weekly-sales", "review-reply", "monthly-sales", "settings", "blog", "launch", "plan"].includes(name));
+  $("placeholderView").classList.toggle("hidden", isShorts || ["home", "weekly-sales", "review-reply", "monthly-sales", "settings", "blog", "launch", "plan", "promo"].includes(name));
   if (name === "monthly-sales") monthlyOpen();
   if (name === "review-reply") reviewOpen();
   if (name === "weekly-sales") weeklyOpen();

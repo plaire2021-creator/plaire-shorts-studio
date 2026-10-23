@@ -22,6 +22,7 @@ import * as blog from "./lib/blog.js";
 import * as launch from "./lib/launch.js";
 import * as plans from "./lib/plans.js";
 import * as goals from "./lib/goals.js";
+import * as promos from "./lib/promos.js";
 
 const PORT = Number(process.env.PORT || loadConfig().port || 4173);
 tiktok.setPort(PORT);
@@ -300,6 +301,29 @@ const blogView = (r) => {
   if (r.status === "running" && !live && !alive(r.server_pid)) return { ...r, status: "failed", error: "스튜디오가 꺼져서 중단됐어요. 다시 넣어 주세요" };
   return { ...r, running: live || (r.status === "running" && alive(r.server_pid)) };
 };
+// ---------- 기획전 관리 ----------
+app.get("/api/promos", (req, res) => res.json({ channels: promos.CHANNELS, statuses: promos.STATUSES, members: ["MS팀", ...plans.MEMBERS], items: promos.list() }));
+app.post("/api/promos", (req, res) => {
+  try {
+    res.json(promos.create(req.body));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+app.patch("/api/promos/:id", (req, res) => {
+  try {
+    res.json(promos.update(req.params.id, req.body));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+app.delete("/api/promos/:id", (req, res) => {
+  try {
+    res.json(promos.remove(req.params.id));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
 // ---------- 홈: 월간 목표 매출 ----------
 app.get("/api/goals", async (req, res) => {
   try {

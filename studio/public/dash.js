@@ -23,6 +23,10 @@
   async function loadReviews() {
     try { revs = await getJSON("/api/reviews/runs"); } catch { revs = []; }
   }
+  let promos = null;
+  async function loadPromos() {
+    try { promos = (await getJSON("/api/promos")).items; } catch { promos = []; }
+  }
   async function loadPlan() {
     try {
       const r = await getJSON("/api/plans");
@@ -37,12 +41,12 @@
     catch (e) { goals = { month, error: e.message, targets: {}, actual: {}, through: {}, channels: [] }; }
   }
   window.homeDashOpen = async function () {
-    await Promise.all([loadPlan(), loadGoals(), loadReviews()]);
+    await Promise.all([loadPlan(), loadGoals(), loadReviews(), loadPromos()]);
     render();
     clearInterval(timer);
     timer = setInterval(async () => {
       if (D.closest(".hidden") || editing) return;
-      await Promise.all([loadPlan(), loadReviews()]);
+      await Promise.all([loadPlan(), loadReviews(), loadPromos()]);
       render();
     }, 30000);
   };
@@ -99,6 +103,20 @@
     </section>`;
   }
 
+  // ---------- 기획전 일정 (기획전 관리에서 끝나지 않은 것만) ----------
+  function promoCard() {
+    const P = window.promoPhase, per = window.promoPeriod, K = window.promoChKey || {};
+    const rows = (P ? promos : []).map((it) => ({ it, p: P(it) })).filter((x) => !x.p.past)
+      .sort((a, b) => a.p.o - b.p.o || (a.it.start || a.it.apply_by || "9").localeCompare(b.it.start || b.it.apply_by || "9"));
+    const n = (k) => rows.filter((x) => x.p.k === k).length;
+    const sum = [["live", "진행 중"], ["soon", "진행 예정"], ["wait", "결과 대기"], ["todo", "신청 전"]].filter(([k]) => n(k)).map(([k, t]) => `<span class="pm-pill ${k}">${t} ${n(k)}</span>`).join("");
+    return `<section class="card hd-card">
+      <div class="hd-head"><h2>기획전 일정</h2>${sum ? `<span class="hd-psum">${sum}</span>` : ""}<a class="hd-more" href="#/promo">기획전 관리 열기</a></div>
+      ${rows.length ? `<div class="hd-promos">${rows.slice(0, 8).map(({ it, p }) => `<a class="hd-pr" href="#/promo"><span class="hd-pr-ch"><i class="pm-dot ${K[it.ch] || ""}"></i>${esc(it.ch)}</span><b>${esc(it.name)}</b><span class="hd-pr-d">${per(it)}</span><span class="pm-pill ${p.k}">${esc(p.t)}</span></a>`).join("")}</div>${rows.length > 8 ? `<p class="muted hd-extra">외 ${rows.length - 8}건</p>` : ""}`
+      : `<p class="muted hd-empty">진행 중이거나 예정된 기획전이 없어요. 기획전 관리에서 추가해 주세요.</p>`}
+    </section>`;
+  }
+
   // ---------- 월간 목표 매출 ----------
   function brandPanel(brand) {
     const g = goals, chs = g.channels?.length ? g.channels : ["스마트스토어", "쿠팡", "오늘의집"];
@@ -140,7 +158,7 @@
   function render() {
     const t = new Date();
     D.innerHTML = `<div class="hd-top"><img class="home-logo" src="img/plaire-logo.png" alt="PLAIRE FURNITURE"><span class="muted">${t.getMonth() + 1}월 ${t.getDate()}일 ${WD[t.getDay()]}요일</span></div>
-      <div class="hd-row">${planCard()}${reviewCard()}</div>${goals ? goalCard() : ""}`;
+      <div class="hd-row">${planCard()}${reviewCard()}</div>${goals ? goalCard() : ""}${promos ? promoCard() : ""}`;
   }
 
   D.addEventListener("click", async (e) => {
