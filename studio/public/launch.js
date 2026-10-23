@@ -191,6 +191,22 @@ const contentStep = n => /콘텐츠|숏츠/.test(S.steps[n-1]||'');
 // 기획전 관리(promo.js)에 이 제품 옵션코드로 올라간 기획전
 let promoList = null, promoLoading = false;
 async function loadPromos(){ if(promoLoading) return; promoLoading = true; try{ const r = await fetch('/api/promos'); promoList = r.ok ? (await r.json()).items : []; }catch{ promoList = []; } promoLoading = false; render(); }
+function myPromos(){
+  if(!S.product.code || !window.promoPhase) return [];
+  if(promoList === null){ setTimeout(loadPromos, 0); return []; }
+  return promoList.filter(p=>(p.products||[]).some(x=>window.promoSameCode(x.code, S.product.code)));
+}
+// 달력용: 날짜 → [{기획전 띠}] (진행 기간 매일) + 신청 마감일 (신청 전일 때만)
+function promoDays(){
+  const out = {}, add = (d,o) => (out[d] = out[d] || []).push(o);
+  myPromos().forEach(p=>{
+    const k = window.promoChKey[p.ch]||'', ph = window.promoPhase(p);
+    if(ph.k==='off') return;
+    if(p.start && p.end) for(let t=Date.parse(p.start+'T00:00:00Z'), e=Date.parse(p.end+'T00:00:00Z'); t<=e; t+=864e5){ const d=fmt(t); add(d,{k, name:p.name, ch:p.ch, first:d===p.start, last:d===p.end}); }
+    if(p.apply_by && p.status==='신청 전') add(p.apply_by,{k, name:p.name, ch:p.ch, apply:true});
+  });
+  return out;
+}
 function promoBox(){
   if(!S.product.code || !window.promoPhase) return '';
   if(promoList === null){ setTimeout(loadPromos, 0); return ''; }
@@ -569,10 +585,10 @@ function calDays(){
 function vCal(){
   if(!calMonth) calMonth = TODAY.slice(0,7);
   const [y,m] = calMonth.split('-').map(Number);
-  const first = Date.UTC(y,m-1,1), startDow = new Date(first).getUTCDay(), days = calDays();
+  const first = Date.UTC(y,m-1,1), startDow = new Date(first).getUTCDay(), days = calDays(), pdays = promoDays();
   const cells = (startDow + new Date(Date.UTC(y,m,0)).getUTCDate()) > 35 ? 42 : 35;
   let h = `<div class="mc-head"><button class="btn small" id="calPrev" aria-label="이전 달">◀</button><b>${y}년 ${m}월</b><button class="btn small" id="calNext" aria-label="다음 달">▶</button><button class="btn small" id="calToday">오늘</button>
-    <span class="mc-lg"><span><i class="todo"></i>마감</span><span><i class="late"></i>마감 지남</span><span><i class="done"></i>끝남</span></span></div>
+    <span class="mc-lg">${Object.keys(pdays).length?'<span><i class="pr"></i>기획전</span>':''}<span><i class="todo"></i>마감</span><span><i class="late"></i>마감 지남</span><span><i class="done"></i>끝남</span></span></div>
     <div class="mcal">${WD.map(w=>`<div class="mc-wd">${w}</div>`).join('')}`;
   for(let i=0;i<cells;i++){
     const t = first + (i-startDow)*864e5, d = fmt(t), dt = new Date(t), out = dt.getUTCMonth()!==m-1;
@@ -580,6 +596,9 @@ function vCal(){
     const isL = d===S.product.launch;
     h += `<button class="mc-day ${out?'out':''} ${d===TODAY?'today':''} ${isL?'launch':''} ${calSel===d?'sel':''}" data-calday="${d}" aria-label="${kd(d)}${gs.length?' 마감 '+gs.length+'개':''}">
       <span class="mc-dn">${dt.getUTCDate()}${isL?'<em>출시</em>':''}</span>
+      ${(pdays[d]||[]).map(p=>p.apply
+        ? `<span class="mc-pa ${p.k}" title="${esc(p.ch)} ${esc(p.name)} 신청 마감">${esc(p.name)} 신청 마감</span>`
+        : `<span class="mc-pr ${p.k} ${p.first?'first':''} ${p.last?'last':''}" title="${esc(p.ch)} ${esc(p.name)}">${p.first||dt.getUTCDay()===0?esc(p.name):'&nbsp;'}</span>`).join('')}
       ${gs.slice(0,3).map(g=>`<span class="mc-ev ${g.state} ${g.weekly?'mc-wkly':''}">${g.weekly?'↻':'<i></i>'}${esc(g.label)}</span>`).join('')}${gs.length>3?`<span class="mc-more">+${gs.length-3}</span>`:''}</button>`;
   }
   h += `</div>`;

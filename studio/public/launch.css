@@ -575,3 +575,14 @@
 #launchView .ln-pr b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #launchView .ln-pr .pm-pill{justify-self:end}
 @media (max-width:860px){#launchView .ln-pr{grid-template-columns:auto 1fr auto}#launchView .ln-pr-ch,#launchView .ln-pr-d{display:none}}
+/* 일정 달력: 이 제품이 들어간 기획전 (기획전 관리에서 자동) */
+#launchView .mc-day{overflow:visible}
+#launchView .mc-pr{display:block;margin:0 -9px 2px;padding:1px 9px;font-size:11px;font-weight:600;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+#launchView .mc-pr.first{margin-left:0;border-top-left-radius:5px;border-bottom-left-radius:5px}
+#launchView .mc-pr.last{margin-right:0;border-top-right-radius:5px;border-bottom-right-radius:5px}
+#launchView .mc-pr.ss{background:#e3f8ec;color:#028a3e}
+#launchView .mc-pr.cp{background:#fde8e7;color:#c42520}
+#launchView .mc-pr.oh{background:#e2f5fc;color:#1683b0}
+#launchView .mc-pa{display:block;font-size:11px;font-weight:600;text-align:left;border:1px dashed currentColor;border-radius:5px;padding:0 6px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#launchView .mc-pa.ss{color:#028a3e}#launchView .mc-pa.cp{color:#c42520}#launchView .mc-pa.oh{color:#1683b0}
+#launchView .mc-lg i.pr{background:linear-gradient(90deg,#03c75a 33%,#e5322d 33% 66%,#35b6e8 66%)}
