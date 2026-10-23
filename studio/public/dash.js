@@ -50,12 +50,7 @@
     if (planErr) return `<section class="card hd-card"><h2>이번 주 업무</h2><p class="muted">${esc(planErr)}</p></section>`;
     if (!plan) return `<section class="card hd-card"><h2>이번 주 업무</h2><p class="muted">아직 올린 주간 업무 계획표가 없어요.</p><a class="hd-more" href="#/plan">주간 업무에서 계획표 올리기</a></section>`;
     const all = [], by = { plaire: [0, 0], gazda: [0, 0] };
-    const cats = plan.rows.map((r) => {
-      const its = [...r.plaire, ...r.gazda];
-      for (const s of ["plaire", "gazda"]) for (const i of r[s]) { by[s][1]++; if (i.done) by[s][0]++; }
-      all.push(...its);
-      return { cat: r.cat, done: its.filter((i) => i.done).length, total: its.length };
-    }).filter((c) => c.total);
+    for (const r of plan.rows) for (const s of ["plaire", "gazda"]) for (const i of r[s]) { by[s][1]++; if (i.done) by[s][0]++; all.push(i); }
     const done = all.filter((i) => i.done).length, p = pct(done, all.length);
     const today = iso(new Date());
     const off = plan.leave.flatMap((l) => (l.days?.[today] ? [`${l.name} ${l.days[today]}`] : []));
@@ -63,17 +58,14 @@
     return `<section class="card hd-card">
       <div class="hd-head"><h2>이번 주 업무</h2><span class="muted">${per}</span><a class="hd-more" href="#/plan">주간 업무 열기</a></div>
       <div class="hd-week">
+        ${ring(p, p >= 100 ? "full" : "")}
         <div class="hd-week-sum">
-          ${ring(p, p >= 100 ? "full" : "")}
           <div class="hd-count"><b>${done}</b> / ${all.length}건 완료</div>
           <div class="hd-split">
             <span><i class="dot pl"></i>플레르 ${by.plaire[0]}/${by.plaire[1]}</span>
             <span><i class="dot gz"></i>가즈다 ${by.gazda[0]}/${by.gazda[1]}</span>
           </div>
-          <div class="hd-off">${off.length ? "오늘 휴가 · " + off.map(esc).join(", ") : "오늘 휴가 없음"}</div>
-        </div>
-        <div class="hd-cats">
-          ${cats.map((c) => { const cp = pct(c.done, c.total); return `<div class="hd-cat ${cp >= 100 ? "full" : ""}"><span class="hd-cat-n">${esc(c.cat)}</span><span class="hd-bar"><i style="width:${cp}%"></i></span><span class="hd-cat-v">${c.done}/${c.total}</span></div>`; }).join("")}
+          ${off.length ? `<div class="hd-off">오늘 휴가 · ${off.map(esc).join(", ")}</div>` : ""}
         </div>
       </div>
     </section>`;
