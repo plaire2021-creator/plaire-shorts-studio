@@ -172,8 +172,9 @@
 
       <section class="card hidden" id="blProgress">
         <div class="card-head"><h2>블로그 글을 쓰고 있어요</h2><span class="tag amber" id="blElapsed">0:00</span></div>
+        <div class="gen-load" role="status" aria-live="polite"><span class="gen-spin" aria-hidden="true"></span><div><b id="blGenT">블로그 글 생성 중…</b><span class="muted" id="blNow">주제와 키워드를 찾고 있어요</span></div></div>
+        <div class="gen-bar" aria-hidden="true"><i></i></div>
         <p class="muted">요즘 많이 찾는 주제를 찾아보고, 글을 쓰고, 사진을 3:2로 다듬어요. 보통 5~10분 걸려요. 이 창을 닫아도 계속 써요.</p>
-        <p class="bl-now" id="blNow"></p>
       </section>
 
       <div class="bl-result hidden" id="blResult">
@@ -301,6 +302,8 @@
 
       <section class="card hidden" id="mProgress">
         <div class="card-head"><h2>월간 통계를 만들고 있어요</h2><span class="tag amber" id="mElapsed">0:00</span></div>
+        <div class="gen-load" role="status" aria-live="polite"><span class="gen-spin" aria-hidden="true"></span><div><b id="mGenT">월간 통계 만드는 중…</b><span class="muted" id="mNow">원본 파일을 읽고 있어요</span></div></div>
+        <div class="gen-bar" aria-hidden="true"><i></i></div>
         <p class="muted">보통 1~2분 걸려요. 이 창을 닫아도 계속 진행돼요.</p>
         <ol class="wk-steps" id="mSteps"></ol>
       </section>
@@ -344,6 +347,8 @@
 
       <section class="card hidden" id="wkProgress">
         <div class="card-head"><h2>집계하고 있어요</h2><span class="tag amber" id="wkElapsed">0:00</span></div>
+        <div class="gen-load" role="status" aria-live="polite"><span class="gen-spin" aria-hidden="true"></span><div><b id="wkGenT">주간 통계 집계 중…</b><span class="muted" id="wkNow">원본 파일을 읽고 있어요</span></div></div>
+        <div class="gen-bar" aria-hidden="true"><i></i></div>
         <p class="muted">구글 시트 전 칸 대조까지 보통 5~15분 걸려요. 이 창을 닫아도 계속 진행돼요.</p>
         <ol class="wk-steps" id="wkSteps"></ol>
         <details class="logbox"><summary>진행 내용 보기</summary><ol class="log" id="wkLog"></ol></details>
@@ -443,8 +448,9 @@
       <!-- 만드는 중 -->
       <section class="card hidden" id="stepProgress">
         <div class="card-head"><h2 id="progressTitle">영상을 만들고 있어요</h2><span class="tag amber" id="elapsed">0:00</span></div>
+        <div class="gen-load" role="status" aria-live="polite"><span class="gen-spin" aria-hidden="true"></span><div><b id="genT">영상 생성 중…</b><span class="muted" id="genNow">사진과 상세페이지를 살펴보고 있어요</span></div></div>
+        <div class="gen-bar" aria-hidden="true"><i></i></div>
         <p class="muted" id="progressDesc">보통 3~5분 걸려요. 이 창을 닫아도 계속 만들어요.</p>
-        <div class="track"><div></div></div>
         <details class="logbox"><summary>진행 내용 보기</summary><ol class="log" id="log"></ol></details>
       </section>
 

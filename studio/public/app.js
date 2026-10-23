@@ -211,6 +211,7 @@ function render(fromPoll) {
   if (!j) return;
   const copy = j.kind === "copy";
   $("progressTitle").textContent = copy ? "제목·설명글을 쓰고 있어요" : "영상을 만들고 있어요";
+  $("genT").textContent = copy ? "문구 생성 중…" : "영상 생성 중…";
   $("progressDesc").textContent = copy ? "보통 1~2분 걸려요. 이 창을 닫아도 계속 써요." : "보통 3~5분 걸려요. 이 창을 닫아도 계속 만들어요.";
   $("redoSummary").textContent = copy ? "문구 다시 쓰기" : "다시 만들기";
   $("regenBtn").textContent = copy ? "다시 쓰기" : "다시 만들기";
@@ -220,6 +221,8 @@ function render(fromPoll) {
     const sec = Math.round((Date.now() - new Date(j.started_at)) / 1000);
     $("elapsed").textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
     $("log").innerHTML = (j.log || []).slice(-40).map((l) => `<li>${esc(l.m)}</li>`).join("");
+    const lastLog = (j.log || []).map((l) => l.m).filter((m) => m && !/^·/.test(m)).slice(-1)[0];
+    if (lastLog) $("genNow").textContent = lastLog.slice(0, 80);
     return;
   }
   if (!j.result) {
@@ -810,6 +813,7 @@ function wkRender() {
     $("wkElapsed").textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
     const step = Math.max(0, ...(r.log || []).map((l) => +(l.match(/^\[(\d)\/5\]/) || [])[1] || 0));
     $("wkSteps").innerHTML = WK_STEPS.map((s, i) => `<li class="${i + 1 < step ? "done" : i + 1 === step ? "now" : ""}">${s}</li>`).join("");
+    if (WK_STEPS[step - 1]) $("wkNow").textContent = WK_STEPS[step - 1];
     $("wkLog").innerHTML = log;
     $("crumb").textContent = "집계 중";
     return;
@@ -1213,6 +1217,7 @@ function mShow() {
     $("mElapsed").textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
     const step = Math.max(0, ...(r.log || []).map((l) => +(l.match(/^\[(\d)\]/) || [])[1] || 0));
     $("mSteps").innerHTML = M_STEPS.map((s, i) => `<li class="${i + 1 < step ? "done" : i + 1 === step ? "now" : ""}">${s}</li>`).join("");
+    if (M_STEPS[step - 1]) $("mNow").textContent = M_STEPS[step - 1];
     $("crumb").textContent = "만드는 중";
     return;
   }
@@ -1492,7 +1497,7 @@ function blRender() {
     $("blResult").classList.add("hidden");
     const sec = Math.round((Date.now() - new Date(r.started_at)) / 1000);
     $("blElapsed").textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
-    $("blNow").textContent = (r.log || []).filter((l) => !l.startsWith("·")).slice(-1)[0] || "";
+    $("blNow").textContent = ((r.log || []).filter((l) => !l.startsWith("·")).slice(-1)[0] || "주제와 키워드를 찾고 있어요").slice(0, 80);
     return;
   }
   $("blProgress").classList.add("hidden");
