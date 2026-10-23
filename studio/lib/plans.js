@@ -5,6 +5,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { execFile } from "node:child_process";
 import { DATA_DIR, PLUGIN_ROOT } from "./store.js";
+import * as goals from "./goals.js";
 
 const DIR = path.join(DATA_DIR, "plans");
 export const MEMBERS = ["김은하", "박주혁", "방채원"];
@@ -65,6 +66,7 @@ function parse(xlsx) {
 // 엑셀을 올리면: 같은 주가 이미 있으면 같은 문장 업무의 체크·링크와 휴가 표시는 이어받는다
 export async function importXlsx(xlsx, name) {
   const r = await parse(xlsx);
+  try { goals.importFromPlan(r.goals); } catch {} // '월간목표매출' 시트가 있으면 홈 목표 매출도 맞춘다
   const id = r.period?.[0] || new Date().toISOString().slice(0, 10);
   let prev = null;
   try {

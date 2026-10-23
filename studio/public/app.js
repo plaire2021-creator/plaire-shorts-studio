@@ -596,6 +596,7 @@ function route() {
   $("homeView").classList.toggle("hidden", name !== "home");
   $("planView").classList.toggle("hidden", name !== "plan");
   if (name === "plan") window.homeOpen?.();
+  if (name === "home") window.homeDashOpen?.();
   $("shortsView").classList.toggle("hidden", !isShorts);
   $("weeklyView").classList.toggle("hidden", name !== "weekly-sales");
   $("reviewView").classList.toggle("hidden", name !== "review-reply");

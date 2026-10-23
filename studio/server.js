@@ -21,6 +21,7 @@ import * as backup from "./lib/backup.js";
 import * as blog from "./lib/blog.js";
 import * as launch from "./lib/launch.js";
 import * as plans from "./lib/plans.js";
+import * as goals from "./lib/goals.js";
 
 const PORT = Number(process.env.PORT || loadConfig().port || 4173);
 tiktok.setPort(PORT);
@@ -299,6 +300,22 @@ const blogView = (r) => {
   if (r.status === "running" && !live && !alive(r.server_pid)) return { ...r, status: "failed", error: "스튜디오가 꺼져서 중단됐어요. 다시 넣어 주세요" };
   return { ...r, running: live || (r.status === "running" && alive(r.server_pid)) };
 };
+// ---------- 홈: 월간 목표 매출 ----------
+app.get("/api/goals", async (req, res) => {
+  try {
+    res.json(await goals.get(String(req.query.month || new Date().toISOString().slice(0, 7))));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+app.put("/api/goals", (req, res) => {
+  try {
+    const { month, brand, targets } = req.body || {};
+    res.json(goals.setTargets(month, brand, targets));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
 // ---------- 주간 업무 계획표 (홈 화면) ----------
 app.get("/api/plans", (req, res) => res.json({ members: plans.MEMBERS, plans: plans.list() }));
 app.get("/api/plans/:id", (req, res) => {

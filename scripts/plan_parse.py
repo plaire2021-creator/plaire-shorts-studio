@@ -85,6 +85,31 @@ def pick_sheet(wb):
     return wb.worksheets[0]
 
 
+def goals_of(wb, year):
+    """'월간목표매출' 시트: <플레르가구>/<가즈다가구> 묶음의 '목표매출' 표 → {브랜드: {"YYYY-MM": {채널: 원}}}"""
+    ws = next((w for w in wb.worksheets if "목표" in w.title and "월간" in w.title), None)
+    if not ws or not year:
+        return {}
+    out, brand, cols, on = {}, None, None, False
+    for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row, 80), max_col=20, values_only=True):
+        t = [cell_text(v) for v in row]
+        b = next((x for x in t if x.startswith("<") and ("플레르" in x or "가즈다" in x)), None)
+        if b:
+            brand, on = ("플레르가구" if "플레르" in b else "가즈다가구"), False
+            continue
+        if t and t[0] in ("목표매출", "달성매출"):
+            on = t[0] == "목표매출"
+            cols = {i: int(re.match(r"(\d+)월", x).group(1)) for i, x in enumerate(t) if re.fullmatch(r"\d+월", x)}
+            continue
+        ch = t[1] if len(t) > 1 else ""
+        if on and brand and cols and ch in ("스마트스토어", "쿠팡", "오늘의집"):
+            for i, m in cols.items():
+                v = row[i]
+                if isinstance(v, (int, float)) and v > 0:
+                    out.setdefault(brand, {}).setdefault("%04d-%02d" % (year, m), {})[ch] = int(v)
+    return out
+
+
 def main():
     wb = openpyxl.load_workbook(sys.argv[1], data_only=True)
     ws = pick_sheet(wb)
@@ -129,7 +154,8 @@ def main():
         row = {"cat": cat or "기타", "note": note, "ref": link, "common": common,
                "plaire": items_of(pt), "gazda": [] if common else items_of(gt)}
         rows.append(row)
-    print(json.dumps({"sheet": ws.title, "title": title, "period": period, "leave": leave, "rows": rows}, ensure_ascii=False))
+    goals = goals_of(wb, int(period[0][:4]) if period else None)
+    print(json.dumps({"sheet": ws.title, "title": title, "period": period, "leave": leave, "rows": rows, "goals": goals}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
