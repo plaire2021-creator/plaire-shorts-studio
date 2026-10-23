@@ -1,4 +1,4 @@
-// 홈 화면 = 이번 주 업무판. 매주 올리는 'MS팀 주간업무계획표' 엑셀을 읽어 업무마다 체크·링크, 사람마다 휴가 표시.
+// '주간 업무' 화면(#/plan) = 이번 주 업무판. 매주 올리는 'MS팀 주간업무계획표' 엑셀을 읽어 업무마다 체크·링크, 사람마다 휴가 표시.
 // 서버: /api/plans (lib/plans.js, scripts/plan_parse.py)
 (function () {
   const H = document.getElementById("homeBoard");
@@ -81,7 +81,7 @@
       </div>
       ${leaveCard()}
       <div class="hp-board">${cur.rows.map((r) => `<section class="hp-row">
-        <div class="hp-cat"><b>${esc(r.cat)}</b>${r.note ? `<small>${esc(r.note)}</small>` : ""}${r.ref ? (isUrl(r.ref) ? `<a class="hp-open" href="${esc(r.ref)}" target="_blank" rel="noopener">참고 링크 ↗</a>` : `<small class="hp-ref">${esc(r.ref)}</small>`) : ""}</div>
+        <div class="hp-cat"><b>${esc(r.cat)}</b></div>
         <div class="hp-cols ${r.common ? "one" : ""}">${r.common ? col(r.plaire, "공통") : col(r.plaire, "플레르가구") + col(r.gazda, "가즈다가구")}</div>
       </section>`).join("")}</div>`;
     if (editing) H.querySelector(`[data-link="${editing}"]`)?.focus();
@@ -143,5 +143,5 @@
   H?.addEventListener("drop", (e) => { if (!e.dataTransfer?.files?.length) return; e.preventDefault(); H.classList.remove("drag"); upload(e.dataTransfer.files[0]); });
 
   // 주소가 처음부터 홈이면 app.js의 첫 화면 전환이 이 파일보다 먼저 돌아서 여기서 연다
-  if (!location.hash.replace(/^#\/?/, "")) window.homeOpen();
+  if (location.hash.replace(/^#\/?/, "") === "plan") window.homeOpen();
 })();

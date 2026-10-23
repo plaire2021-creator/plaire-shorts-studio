@@ -26,6 +26,7 @@
       <a class="nav-item home-item" href="#/" data-route="home"><span class="ico ico-home"></span>홈</a>
 
       <div class="nav-label">업무 관리</div>
+      <a class="nav-item" href="#/plan" data-route="plan"><span class="ico ico-todo"></span>주간 업무</a>
       <a class="nav-item" href="#/launch" data-route="launch"><span class="ico ico-flag"></span>신제품 출시 매뉴얼</a>
 
       <div class="nav-label">콘텐츠 제작</div>
@@ -68,11 +69,48 @@
 
     <!-- 홈 -->
     <div class="content" id="homeView">
-      <div class="welcome home-welcome">
+      <div class="welcome">
         <img class="home-logo" src="img/plaire-logo.png" alt="PLAIRE FURNITURE">
         <h1>플레르 MS팀 업무 도구</h1>
+        <p>필요한 업무를 골라 시작하세요.</p>
       </div>
-      <!-- 이번 주 업무판 (내용은 home.js가 그린다) -->
+      <section class="tool-group">
+      <h2 class="group-title">업무 관리</h2>
+      <div class="tools">
+        <a class="tool" href="#/plan"><span class="tool-ico ico-todo"></span><b>주간 업무</b><small>매주 올리는 업무 계획표를 체크·링크·휴가와 함께 정리해요</small><span class="tag green">사용 중</span></a>
+        <a class="tool" href="#/launch"><span class="tool-ico ico-flag"></span><b>신제품 출시 매뉴얼</b><small>출시일부터 채널별 할 일·체험단·판매 목표·성과를 팀이 함께 챙겨요</small><span class="tag green">사용 중</span></a>
+      </div>
+      </section>
+
+      <section class="tool-group">
+      <h2 class="group-title">콘텐츠 제작</h2>
+      <div class="tools">
+        <a class="tool" href="#/shorts"><span class="tool-ico ico-play"></span><b>숏츠 제작 및 업로드</b><small>제품 사진으로 숏츠를 만들고 유튜브·인스타·틱톡에 올려요</small><span class="tag green">사용 중</span></a>
+        <a class="tool" href="#/upload"><span class="tool-ico ico-up"></span><b>제작된 숏츠 업로드</b><small>이미 만든 영상에 제목·설명글을 써서 채널에 올려요</small><span class="tag green">사용 중</span></a>
+        <a class="tool" href="#/blog"><span class="tool-ico ico-pen"></span><b>블로그 작성 도우미</b><small>많이 찾는 주제로 제품을 녹인 네이버 블로그 글과 3:2 사진을 준비해요</small><span class="tag green">사용 중</span></a>
+      </div>
+      </section>
+
+      <section class="tool-group">
+      <h2 class="group-title">리뷰 관리</h2>
+      <div class="tools">
+        <a class="tool" href="#/review-reply"><span class="tool-ico ico-chat"></span><b>리뷰 답글 작성 도우미</b><small>스마트스토어 리뷰 엑셀로 답글을 쓰고 5점 미만 리뷰를 엑셀로 뽑아요</small><span class="tag green">사용 중</span></a>
+        <a class="tool" href="#/reviews"><span class="tool-ico ico-star"></span><b>제품 리뷰수 종합</b><small>채널별 제품 리뷰 수를 한곳에 모아 보기</small><span class="tag">준비 중</span></a>
+      </div>
+      </section>
+
+      <section class="tool-group">
+      <h2 class="group-title">매출 분석</h2>
+      <div class="tools">
+        <a class="tool" href="#/weekly-sales"><span class="tool-ico ico-bar"></span><b>주간 매출 통계</b><small>원본 파일로 채널별 주간 매출을 집계하고 구글 시트에 반영해요</small><span class="tag green">사용 중</span></a>
+        <a class="tool" href="#/monthly-sales"><span class="tool-ico ico-cal"></span><b>월간 매출 통계</b><small>한 달치 원본으로 회사 매출통계를 만들어요</small><span class="tag green">사용 중</span></a>
+      </div>
+      </section>
+    </div>
+
+    <!-- 주간 업무 (매주 올리는 업무 계획표, 내용은 home.js가 그린다) -->
+    <div class="content hidden" id="planView">
+      <div class="welcome"><h1>주간 업무</h1><p>매주 올리는 MS팀 주간업무계획표를 업무마다 체크하고 링크를 넣어 관리해요.</p></div>
       <div id="homeBoard" class="home-board"></div>
     </div>
 
