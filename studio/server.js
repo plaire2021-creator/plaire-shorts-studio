@@ -20,6 +20,7 @@ import * as team from "./lib/team.js";
 import * as backup from "./lib/backup.js";
 import * as blog from "./lib/blog.js";
 import * as launch from "./lib/launch.js";
+import * as plans from "./lib/plans.js";
 
 const PORT = Number(process.env.PORT || loadConfig().port || 4173);
 tiktok.setPort(PORT);
@@ -298,6 +299,45 @@ const blogView = (r) => {
   if (r.status === "running" && !live && !alive(r.server_pid)) return { ...r, status: "failed", error: "스튜디오가 꺼져서 중단됐어요. 다시 넣어 주세요" };
   return { ...r, running: live || (r.status === "running" && alive(r.server_pid)) };
 };
+// ---------- 주간 업무 계획표 (홈 화면) ----------
+app.get("/api/plans", (req, res) => res.json({ members: plans.MEMBERS, plans: plans.list() }));
+app.get("/api/plans/:id", (req, res) => {
+  try {
+    res.json(plans.load(req.params.id));
+  } catch (e) {
+    res.status(404).json({ error: e.message });
+  }
+});
+app.post("/api/plans", upload.single("file"), async (req, res) => {
+  const f = req.file;
+  try {
+    if (!f) throw new Error("주간 업무 계획표 엑셀을 넣어 주세요");
+    const name = realName(f);
+    if (!/\.xlsx$/i.test(name)) throw new Error("엑셀(.xlsx) 파일만 넣을 수 있어요");
+    fs.renameSync(f.path, f.path + ".xlsx"); // 엑셀 읽는 쪽이 확장자를 본다
+    f.path += ".xlsx";
+    res.json(await plans.importXlsx(f.path, name));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  } finally {
+    if (f) fs.rmSync(f.path, { force: true });
+  }
+});
+app.patch("/api/plans/:id/item", (req, res) => {
+  try {
+    res.json(plans.patchItem(req.params.id, req.body || {}));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+app.patch("/api/plans/:id/leave", (req, res) => {
+  try {
+    res.json(plans.setLeave(req.params.id, req.body || {}));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 // ---------- 신제품 출시 매뉴얼 (제품별, 팀 공용) ----------
 const launchErr = (res, e) => res.status(/찾지 못/.test(e.message) ? 404 : 400).json({ error: e.message });
 app.get("/api/launch/products", (req, res) => res.json({ owners: launch.OWNERS, products: launch.list() }));

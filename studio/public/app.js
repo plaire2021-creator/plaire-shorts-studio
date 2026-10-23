@@ -593,6 +593,7 @@ function route() {
   const isShorts = name === "shorts" || name === "upload"; // 두 화면이 같은 결과·업로드 단계를 씀
   document.querySelectorAll("[data-route]").forEach((a) => a.classList.toggle("on", a.dataset.route === name));
   $("homeView").classList.toggle("hidden", name !== "home");
+  if (name === "home") window.homeOpen?.();
   $("shortsView").classList.toggle("hidden", !isShorts);
   $("weeklyView").classList.toggle("hidden", name !== "weekly-sales");
   $("reviewView").classList.toggle("hidden", name !== "review-reply");
