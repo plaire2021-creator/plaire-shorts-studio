@@ -467,7 +467,7 @@ body.remote .local-only{display:none!important}
 .hp-tools{display:flex;align-items:center;gap:8px}
 .hp-tools select{border:1px solid var(--line-2);border-radius:9px;padding:8px 10px;font:inherit;font-size:13px;background:var(--card)}
 .hp-up{cursor:pointer}
-.hp-sum{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:18px;padding:16px 20px}
+.hp-sum{padding:16px 20px}
 .hp-prog{display:grid;grid-template-columns:auto auto 1fr;align-items:center;gap:12px}
 .hp-prog b{font-size:22px;letter-spacing:-.02em}
 .hp-prog .bar{display:block;height:8px;border-radius:4px;background:var(--bg);overflow:hidden}
@@ -498,3 +498,15 @@ body.remote .local-only{display:none!important}
 .hp-drop{display:grid;justify-items:center;gap:8px;padding:48px 20px;border:2px dashed var(--line-2);border-radius:16px;background:var(--card);text-align:center}
 .hp-drop b{font-size:16px}
 @media (max-width:900px){.hp-row{grid-template-columns:1fr}.hp-cols{grid-template-columns:1fr}.hp-sum{grid-template-columns:1fr}}
+/* 홈: 휴가 칸 (사람 × 요일) */
+.hp-lvcard{padding:14px 20px}
+.hp-lvgrid{display:grid;align-items:center;gap:6px 8px}
+.hp-lvh{font-size:13px;font-weight:700}
+.hp-lvd{font-size:11.5px;color:var(--faint);text-align:center;font-variant-numeric:tabular-nums}
+.hp-lvd.today{color:var(--ink);font-weight:700}
+.hp-lvn{font-size:13px;font-weight:600;display:grid}
+.hp-lvn small{font-size:10.5px;font-weight:500;color:var(--amber);line-height:1.3}
+.hp-lvc{height:30px;border:1px dashed var(--line-2);border-radius:8px;background:none;font:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--amber)}
+.hp-lvc:hover{border-color:var(--sub)}
+.hp-lvc.full{border:1px solid #f1d49c;background:var(--amber-soft)}
+.hp-lvc.half{border:1px solid #f1d49c;background:linear-gradient(90deg,var(--amber-soft) 50%,transparent 50%)}

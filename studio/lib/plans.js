@@ -20,11 +20,15 @@ function write(p) {
 }
 export function load(id) {
   if (!okId(id)) throw new Error("주간 업무를 찾지 못했어요");
+  let p;
   try {
-    return JSON.parse(fs.readFileSync(file(id), "utf8"));
+    p = JSON.parse(fs.readFileSync(file(id), "utf8"));
   } catch {
     throw new Error("주간 업무를 찾지 못했어요");
   }
+  // 1.34.0 휴가 형식({on, memo}) → 날짜별({days, note})
+  p.leave = (p.leave || []).map((l) => (l.days ? l : { name: l.name, days: {}, note: l.on ? l.memo || "휴가" : "" }));
+  return p;
 }
 export function list() {
   if (!fs.existsSync(DIR)) return [];
@@ -72,12 +76,13 @@ export async function importXlsx(xlsx, name) {
     const o = old.get(cat + "|" + side + "|" + x.t);
     return { id: crypto.randomBytes(4).toString("hex"), t: x.t, link: o?.link || x.link || "", done: !!o?.done, done_at: o?.done_at || "" };
   };
-  const leave = MEMBERS.map((n) => {
+  // 휴가: 사람마다 날짜별(연차·반차). 엑셀엔 날짜 없이 '연차 : 이름'만 있어서 그 사람은 '날짜 미정'으로 표시해 둔다
+  const names = [...MEMBERS, ...r.leave.map((l) => l.name).filter((n) => !MEMBERS.includes(n))];
+  const leave = names.map((n) => {
     const p = prev?.leave?.find((l) => l.name === n);
     const f = r.leave.find((l) => l.name === n);
-    return { name: n, on: p ? p.on : !!f, memo: p?.memo || (f ? f.kind : "") };
+    return { name: n, days: p?.days || {}, note: p ? p.note || "" : f ? f.kind : "" };
   });
-  for (const f of r.leave) if (!MEMBERS.includes(f.name)) leave.push({ name: f.name, on: true, memo: f.kind });
   const plan = {
     id,
     title: r.title || "주간업무 계획표",
@@ -108,12 +113,16 @@ export function patchItem(id, { item, done, link }) {
   throw new Error("업무를 찾지 못했어요");
 }
 
-export function setLeave(id, { name, on, memo }) {
+// 휴가 하루 바꾸기: kind = '연차' | '반차' | '' (지우기). 날짜를 하나라도 고르면 엑셀에서 온 '날짜 미정' 표시는 지운다
+export function setLeave(id, { name, date, kind }) {
   const p = load(id);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) throw new Error("날짜가 올바르지 않아요");
   let l = p.leave.find((x) => x.name === name);
-  if (!l) p.leave.push((l = { name: String(name).slice(0, 10), on: false, memo: "" }));
-  if (on !== undefined) l.on = !!on;
-  if (memo !== undefined) l.memo = String(memo).slice(0, 40);
+  if (!l) p.leave.push((l = { name: String(name).slice(0, 10), days: {}, note: "" }));
+  l.days = l.days || {};
+  if (kind === "연차" || kind === "반차") l.days[date] = kind;
+  else delete l.days[date];
+  l.note = "";
   write(p);
   return p.leave;
 }

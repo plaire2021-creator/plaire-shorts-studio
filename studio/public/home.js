@@ -43,6 +43,23 @@
   function col(items, label) {
     return `<div class="hp-col"><span class="hp-brand">${label}</span>${items.length ? items.map(item).join("") : '<span class="muted hp-none">이번 주 업무 없음</span>'}</div>`;
   }
+  // 휴가: 사람 × 요일 칸. 누를 때마다 연차 → 반차 → 비움
+  function weekDays() {
+    const s = cur.period?.[0] || cur.id, e = cur.period?.[1] || s, out = [];
+    for (let t = new Date(s + "T00:00:00"); out.length < 7; t.setDate(t.getDate() + 1)) {
+      const d = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+      if (d > e) break;
+      out.push(d);
+    }
+    return out;
+  }
+  function leaveCard() {
+    const days = weekDays(), today = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+    return `<section class="card hp-lvcard"><div class="hp-lvgrid" style="grid-template-columns:72px repeat(${days.length},minmax(0,1fr))">
+      <span class="hp-lvh">휴가</span>${days.map((d) => `<span class="hp-lvd ${d === today ? "today" : ""}">${md(d)}</span>`).join("")}
+      ${cur.leave.map((l) => `<span class="hp-lvn">${esc(l.name)}${l.note ? `<small>${esc(l.note)} · 날짜를 골라 주세요</small>` : ""}</span>${days.map((d) => { const k = l.days?.[d] || ""; return `<button class="hp-lvc ${k ? (k === "반차" ? "half" : "full") : ""}" data-lvname="${esc(l.name)}" data-lvdate="${d}" aria-label="${esc(l.name)} ${md(d)} ${k || "근무"}">${k}</button>`; }).join("")}`).join("")}
+    </div></section>`;
+  }
   function render() {
     if (!H) return;
     const up = `<label class="btn hp-up">계획표 올리기<input type="file" id="hpFile" accept=".xlsx" hidden></label>`;
@@ -61,8 +78,8 @@
       ${busy ? '<p class="muted">계획표를 읽는 중…</p>' : ""}
       <div class="hp-sum card">
         <div class="hp-prog"><b>${p}%</b><span class="muted">완료 ${done} / ${items.length}건</span><span class="bar"><i style="width:${p}%"></i></span></div>
-        <div class="hp-leave"><span class="muted">휴가</span>${cur.leave.map((l) => `<button class="hp-lv ${l.on ? "on" : ""}" data-leave="${esc(l.name)}" title="누르면 휴가 표시를 ${l.on ? "풀어요" : "해요"}">${esc(l.name)}${l.on ? ` <em>${esc(l.memo || "휴가")}</em>` : ""}</button>`).join("")}</div>
       </div>
+      ${leaveCard()}
       <div class="hp-board">${cur.rows.map((r) => `<section class="hp-row">
         <div class="hp-cat"><b>${esc(r.cat)}</b>${r.note ? `<small>${esc(r.note)}</small>` : ""}${r.ref ? (isUrl(r.ref) ? `<a class="hp-open" href="${esc(r.ref)}" target="_blank" rel="noopener">참고 링크 ↗</a>` : `<small class="hp-ref">${esc(r.ref)}</small>`) : ""}</div>
         <div class="hp-cols ${r.common ? "one" : ""}">${r.common ? col(r.plaire, "공통") : col(r.plaire, "플레르가구") + col(r.gazda, "가즈다가구")}</div>
@@ -98,11 +115,15 @@
   H?.addEventListener("click", async (e) => {
     const lk = e.target.closest("[data-editlink]");
     if (lk) { editing = lk.dataset.editlink; render(); return; }
-    const lv = e.target.closest("[data-leave]");
+    const lv = e.target.closest("[data-lvdate]");
     if (lv) {
-      const l = cur.leave.find((x) => x.name === lv.dataset.leave); l.on = !l.on; render();
-      try { cur.leave = await getJSON(`/api/plans/${cur.id}/leave`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: l.name, on: l.on }) }); render(); }
-      catch (er) { l.on = !l.on; render(); alert(er.message); }
+      const l = cur.leave.find((x) => x.name === lv.dataset.lvname), d = lv.dataset.lvdate, before = JSON.stringify(l);
+      l.days = l.days || {};
+      const next = { "": "연차", 연차: "반차", 반차: "" }[l.days[d] || ""];
+      if (next) l.days[d] = next; else delete l.days[d];
+      l.note = ""; render();
+      try { cur.leave = await getJSON(`/api/plans/${cur.id}/leave`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: l.name, date: d, kind: next }) }); render(); }
+      catch (er) { Object.assign(l, JSON.parse(before)); render(); alert(er.message); }
     }
   });
   H?.addEventListener("change", async (e) => {
