@@ -53,12 +53,17 @@
     }
     return out;
   }
-  function leaveCard() {
-    const days = weekDays(), today = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
-    return `<section class="card hp-lvcard"><div class="hp-lvgrid" style="grid-template-columns:72px repeat(${days.length},minmax(0,1fr))">
-      <span class="hp-lvh">휴가</span>${days.map((d) => `<span class="hp-lvd ${d === today ? "today" : ""}">${md(d)}</span>`).join("")}
-      ${cur.leave.map((l) => `<span class="hp-lvn">${esc(l.name)}${l.note ? `<small>${esc(l.note)} · 날짜를 골라 주세요</small>` : ""}</span>${days.map((d) => { const k = l.days?.[d] || ""; return `<button class="hp-lvc ${k ? (k === "반차" ? "half" : "full") : ""}" data-lvname="${esc(l.name)}" data-lvdate="${d}" aria-label="${esc(l.name)} ${md(d)} ${k || "근무"}">${k}</button>`; }).join("")}`).join("")}
-    </div></section>`;
+  let lvForm = null; // {name, date, kind} — '+ 휴가'를 눌렀을 때만 보이는 작은 입력 줄
+  function leaveLine() {
+    const days = weekDays(), chips = [];
+    for (const l of cur.leave) {
+      for (const d of Object.keys(l.days || {}).sort()) chips.push(`<span class="hp-lchip ${l.days[d] === "반차" ? "half" : ""}">${esc(l.name)} ${md(d)} ${esc(l.days[d])}<button data-lvdel="${esc(l.name)}|${d}" aria-label="${esc(l.name)} ${md(d)} 휴가 지우기">✕</button></span>`);
+      if (l.note && !Object.keys(l.days || {}).length) chips.push(`<button class="hp-lchip todo" data-lvpick="${esc(l.name)}" title="눌러서 날짜를 정해 주세요">${esc(l.name)} ${esc(l.note)} · 날짜 미정</button>`);
+    }
+    const f = lvForm;
+    return `<div class="hp-lline"><span class="hp-lh">휴가</span>${chips.join("") || '<span class="muted">이번 주 휴가 없음</span>'}
+      ${f ? `<span class="hp-lform"><select data-lvf="name">${cur.leave.map((l) => `<option ${l.name === f.name ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select><select data-lvf="date">${days.map((d) => `<option value="${d}" ${d === f.date ? "selected" : ""}>${md(d)}</option>`).join("")}</select><select data-lvf="kind"><option ${f.kind === "연차" ? "selected" : ""}>연차</option><option ${f.kind === "반차" ? "selected" : ""}>반차</option></select><button class="hp-lk" id="lvAdd">추가</button><button class="hp-lk" id="lvCancel">취소</button></span>`
+        : `<button class="hp-lk" id="lvOpen">+ 휴가</button>`}</div>`;
   }
   function render() {
     if (!H) return;
@@ -78,8 +83,8 @@
       ${busy ? '<p class="muted">계획표를 읽는 중…</p>' : ""}
       <div class="hp-sum card">
         <div class="hp-prog"><b>${p}%</b><span class="muted">완료 ${done} / ${items.length}건</span><span class="bar"><i style="width:${p}%"></i></span></div>
+        ${leaveLine()}
       </div>
-      ${leaveCard()}
       <div class="hp-board">${cur.rows.map((r) => `<section class="hp-row">
         <div class="hp-cat"><b>${esc(r.cat)}</b></div>
         <div class="hp-cols ${r.common ? "one" : ""}">${r.common ? col(r.plaire, "공통") : col(r.plaire, "플레르가구") + col(r.gazda, "가즈다가구")}</div>
@@ -115,15 +120,17 @@
   H?.addEventListener("click", async (e) => {
     const lk = e.target.closest("[data-editlink]");
     if (lk) { editing = lk.dataset.editlink; render(); return; }
-    const lv = e.target.closest("[data-lvdate]");
-    if (lv) {
-      const l = cur.leave.find((x) => x.name === lv.dataset.lvname), d = lv.dataset.lvdate, before = JSON.stringify(l);
-      l.days = l.days || {};
-      const next = { "": "연차", 연차: "반차", 반차: "" }[l.days[d] || ""];
-      if (next) l.days[d] = next; else delete l.days[d];
-      l.note = ""; render();
-      try { cur.leave = await getJSON(`/api/plans/${cur.id}/leave`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: l.name, date: d, kind: next }) }); render(); }
-      catch (er) { Object.assign(l, JSON.parse(before)); render(); alert(er.message); }
+    if (e.target.closest("#lvOpen")) { lvForm = { name: cur.leave[0]?.name, date: weekDays()[0], kind: "연차" }; return render(); }
+    if (e.target.closest("#lvCancel")) { lvForm = null; return render(); }
+    const pick = e.target.closest("[data-lvpick]");
+    if (pick) { lvForm = { name: pick.dataset.lvpick, date: weekDays()[0], kind: cur.leave.find((l) => l.name === pick.dataset.lvpick)?.note === "반차" ? "반차" : "연차" }; return render(); }
+    const add = e.target.closest("#lvAdd"), del = e.target.closest("[data-lvdel]");
+    if (add || del) {
+      const [name, date, kind] = add ? [lvForm.name, lvForm.date, lvForm.kind] : [...del.dataset.lvdel.split("|"), ""];
+      lvForm = null;
+      try { cur.leave = await getJSON(`/api/plans/${cur.id}/leave`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, date, kind }) }); }
+      catch (er) { alert(er.message); }
+      return render();
     }
   });
   H?.addEventListener("change", async (e) => {
@@ -131,6 +138,7 @@
     if (el.id === "hpFile") return upload(el.files[0]);
     if (el.id === "hpWeek") { cur = await getJSON("/api/plans/" + el.value); editing = null; return render(); }
     if (el.dataset.done) return patch(el.dataset.done, { done: el.checked });
+    if (el.dataset.lvf && lvForm) lvForm[el.dataset.lvf] = el.value;
   });
   H?.addEventListener("keydown", (e) => {
     if (e.target.dataset?.link && e.key === "Enter" && !e.isComposing) { e.preventDefault(); saveLink(e.target); }

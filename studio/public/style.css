@@ -512,3 +512,13 @@ body.remote .local-only{display:none!important}
 .hp-lvc:hover{border-color:var(--sub)}
 .hp-lvc.full{border:1px solid #f1d49c;background:var(--amber-soft)}
 .hp-lvc.half{border:1px solid #f1d49c;background:linear-gradient(90deg,var(--amber-soft) 50%,transparent 50%)}
+/* 주간 업무: 휴가 한 줄 */
+.hp-sum{display:grid;gap:10px}
+.hp-lline{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px}
+.hp-lh{font-weight:700;color:var(--sub);margin-right:4px}
+.hp-lchip{display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 10px;border-radius:999px;background:var(--amber-soft);color:var(--amber);font:inherit;font-size:12px;font-weight:600;border:0}
+.hp-lchip.half{background:linear-gradient(90deg,var(--amber-soft) 60%,#fdf8ee 60%)}
+.hp-lchip.todo{padding:2px 10px;border:1px dashed #f1d49c;background:none;cursor:pointer}
+.hp-lchip button{border:0;background:none;color:var(--amber);font-size:11px;cursor:pointer;padding:0 4px}
+.hp-lform{display:inline-flex;align-items:center;gap:4px}
+.hp-lform select{border:1px solid var(--line-2);border-radius:6px;padding:2px 6px;font:inherit;font-size:12px;background:var(--card)}
