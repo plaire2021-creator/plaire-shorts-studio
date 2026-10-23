@@ -77,7 +77,8 @@
         <div class="pm-f"><span>신청 상태</span><div class="pm-seg st">${st.map((s) => `<button type="button" class="${e.status === s ? "on" : ""}" data-set="status" data-v="${s}">${s}</button>`).join("")}</div></div>
         <div class="pm-f"><span>${e.status === "선정" ? "선정 제품" : "신청 제품"}</span>
           ${e.products.length ? `<div class="pm-plist">${e.products.map((p, i) => `<span class="pm-pi"><b>${esc(p.name || "-")}</b><code>${esc(p.code || "코드 없음")}</code><button type="button" data-delp="${i}" aria-label="${esc(p.name || p.code)} 빼기">✕</button></span>`).join("")}</div>` : ""}
-          <div class="pm-prow"><input id="pmCode" placeholder="옵션코드" list="pmCodes"><input id="pmName" placeholder="제품명"><button type="button" class="btn" id="pmAddP">추가</button></div>
+          <div class="pm-prow"><input id="pmCode" placeholder="옵션코드" list="pmCodes"><input id="pmName" placeholder="제품명 (시트에서 자동)"><button type="button" class="btn" id="pmAddP">추가</button></div>
+          <p class="pm-hint" id="pmHint"></p>
           <datalist id="pmCodes">${launches.map((l) => `<option value="${esc(l.code)}">${esc(l.name)}</option>`).join("")}</datalist></div>
         <div class="pm-f2 even">
           <label class="pm-f"><span>기획전 링크${e.link ? ` <a href="${esc(e.link)}" target="_blank" rel="noopener">열기 ↗</a>` : ""}</span><input data-f="link" value="${esc(e.link)}" placeholder="기획전 페이지 주소"></label>
@@ -100,8 +101,47 @@
     if (!edit) return;
     V.querySelectorAll("[data-f]").forEach((i) => (edit[i.dataset.f] = i.value));
   }
-  function addProduct() {
-    const code = V.querySelector("#pmCode")?.value.trim() || "", name = V.querySelector("#pmName")?.value.trim() || "";
+  // 구글 시트 「상품등록 현황」에서 옵션코드로 상품명 찾기 (/api/launch/lookup — 출시 매뉴얼과 같은 조회, 같은 코드는 한 번만)
+  const looked = new Map();
+  const norm = (x) => String(x || "").replace(/\s/g, "").toLowerCase();
+  function sheetFind(code) {
+    code = code.trim();
+    if (code.length < 2) return Promise.resolve(null);
+    if (!looked.has(code))
+      looked.set(code, getJSON("/api/launch/lookup?code=" + encodeURIComponent(code)).then((r) => {
+        const ms = r.by === "옵션코드" ? r.matches || [] : [];
+        const exact = ms.find((m) => norm(m.code) === norm(code));
+        return { hit: exact || (ms.length === 1 ? ms[0] : null), many: exact ? [] : ms };
+      }).catch(() => { looked.delete(code); return { err: true }; }));
+    return looked.get(code);
+  }
+  let lookTimer = null;
+  function hint(t, warn) { const h = V.querySelector("#pmHint"); if (h) { h.textContent = t || ""; h.classList.toggle("warn", !!warn); } }
+  async function fillFromSheet(code) {
+    const n = V.querySelector("#pmName");
+    if (!code.trim()) return hint("");
+    hint("구글 시트에서 찾는 중…");
+    const r = await sheetFind(code);
+    if (V.querySelector("#pmCode")?.value.trim() !== code.trim()) return; // 그 사이 코드를 바꿨으면 무시
+    if (!r) return hint("");
+    if (r.err) return hint("구글 시트를 읽지 못했어요. 제품명을 직접 써 주세요", true);
+    if (r.hit) {
+      if (n && (!n.value || n.dataset.auto)) { n.value = r.hit.name; n.dataset.auto = "1"; }
+      return hint(`구글 시트 ${r.hit.brand} · ${r.hit.code}`);
+    }
+    if (r.many.length) {
+      // 앞부분만 넣으면 옵션이 여러 개 걸린다 → 고를 수 있게 목록에 넣는다
+      const dl = V.querySelector("#pmCodes");
+      if (dl) dl.innerHTML = r.many.map((m) => `<option value="${esc(m.code)}">${esc(m.name)}</option>`).join("");
+      return hint(`옵션코드 ${r.many.length}개가 걸려요. 옵션코드 칸에서 정확한 코드를 골라 주세요`, true);
+    }
+    hint("구글 시트에서 이 옵션코드를 찾지 못했어요", true);
+  }
+
+  async function addProduct() {
+    const code = V.querySelector("#pmCode")?.value.trim() || "";
+    if (code && !V.querySelector("#pmName")?.value.trim()) { clearTimeout(lookTimer); await fillFromSheet(code); }
+    const name = V.querySelector("#pmName")?.value.trim() || "";
     if (!code && !name) return false;
     grab();
     if (!edit.products.some((p) => (code && p.code === code) || (!code && p.name === name))) edit.products.push({ code, name });
@@ -134,15 +174,19 @@
     if ((e.target.id === "pmCode" || e.target.id === "pmName") && e.key === "Enter") { e.preventDefault(); addProduct(); }
     if (e.key === "Escape" && edit) { edit = null; render(); }
   });
-  // 옵션코드를 치면 출시 매뉴얼에 있는 제품은 제품명이 자동으로 들어간다 (직접 쓴 이름은 그대로)
+  // 옵션코드를 치면 잠깐 뒤 구글 시트에서 상품명을 찾아 제품명에 넣는다 (직접 쓴 이름은 그대로)
   V.addEventListener("input", (e) => {
+    if (e.target.id === "pmName") { e.target.dataset.auto = ""; return; }
     if (e.target.id !== "pmCode") return;
-    const n = V.querySelector("#pmName"), hit = launches.find((l) => sameCode(e.target.value, l.code));
-    if (n && (!n.value || n.dataset.auto)) { n.value = hit ? hit.name : ""; n.dataset.auto = hit ? "1" : ""; }
+    const n = V.querySelector("#pmName");
+    if (n && n.dataset.auto) { n.value = ""; n.dataset.auto = ""; }
+    clearTimeout(lookTimer);
+    const code = e.target.value;
+    lookTimer = setTimeout(() => fillFromSheet(code), 500);
   });
   V.addEventListener("submit", async (e) => {
     e.preventDefault();
-    addProduct();
+    await addProduct();
     grab();
     const body = { ch: edit.ch, name: edit.name, start: edit.start, end: edit.end, apply_by: edit.apply_by, status: edit.status, products: edit.products, owner: edit.owner, link: edit.link, apply_link: edit.apply_link, memo: edit.memo };
     if (body.start && body.end && body.end < body.start) return alert("끝나는 날이 시작일보다 빨라요");
