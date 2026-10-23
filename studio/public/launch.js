@@ -188,6 +188,18 @@ function toolLinks(stepName){
 }
 // 콘텐츠 단계(이름에 '콘텐츠'·'숏츠'): 업무마다 게시물 링크 칸, 링크를 넣으면 완료로 체크
 const contentStep = n => /콘텐츠|숏츠/.test(S.steps[n-1]||'');
+// 기획전 관리(promo.js)에 이 제품 옵션코드로 올라간 기획전
+let promoList = null, promoLoading = false;
+async function loadPromos(){ if(promoLoading) return; promoLoading = true; try{ const r = await fetch('/api/promos'); promoList = r.ok ? (await r.json()).items : []; }catch{ promoList = []; } promoLoading = false; render(); }
+function promoBox(){
+  if(!S.product.code || !window.promoPhase) return '';
+  if(promoList === null){ setTimeout(loadPromos, 0); return ''; }
+  const mine = promoList.filter(p=>(p.products||[]).some(x=>window.promoSameCode(x.code, S.product.code)))
+    .map(p=>({p, ph: window.promoPhase(p)})).sort((a,b)=>(a.ph.past?1:0)-(b.ph.past?1:0) || (a.p.start||'9').localeCompare(b.p.start||'9'));
+  return `<div class="panel ln-promo"><div class="ds-head"><h3>기획전</h3><a class="linkbtn" href="#/promo">기획전 관리 열기</a></div>${mine.length
+    ? `<div class="ln-prs">${mine.map(({p,ph})=>`<a class="ln-pr ${ph.past?'past':''}" href="#/promo"><i class="pm-dot ${window.promoChKey[p.ch]||''}"></i><span class="ln-pr-ch">${esc(p.ch)}</span><b>${esc(p.name)}</b><span class="ln-pr-d">${window.promoPeriod(p)}</span><span class="pm-pill ${ph.k}">${esc(ph.t)}</span></a>`).join('')}</div>`
+    : `<p class="note">기획전 관리에 이 제품 옵션코드(${esc(S.product.code)})로 신청한 기획전이 아직 없어요.</p>`}</div>`;
+}
 function vDash(){
   const T = TK(), done = T.filter(t=>t.st==='완료').length, late = T.filter(isLate).length;
   const stepSt = n => n===EXPN() ? expStepStatus() : stepStatus(n);
@@ -207,6 +219,7 @@ function vDash(){
   <div class="dm-lg"><span><i class="ok"></i>완료 ${done}</span><span><i class="bad"></i>보류 ${hold}</span><span><i class="ing"></i>진행중 ${ing}</span><span><i></i>대기 ${wait}</span></div></div>
   <button class="tile ds-kpi" data-tab="gp"><span class="k">판매 <em>3개 채널 합계</em></span><span class="v">${sl.q!=null?won0(sl.q):'-'}<small>${gq?` / ${gq}대`:'대'}</small></span><span class="bar"><i style="width:${sp}%"></i></span><span class="s">${sl.msg || (gq?`목표의 ${sp}%`:'성과 탭에서 목표를 적어 주세요')}</span></button>
   <button class="tile ds-kpi" data-tab="gp"><span class="k">리뷰</span><span class="v">${rn}<small>${rg?` / ${rg}건`:'건'}</small></span><span class="bar"><i style="width:${rp}%"></i></span><span class="s">${rg?`목표의 ${rp}%`:'성과 탭에서 목표를 적어 주세요'}</span></button></div>`;
+  h += promoBox();
   h += `<div class="panel ds-main"><div class="ds-head"><h3>업무 진행 순서</h3></div><div class="ds-list">`;
   S.steps.forEach((nm,i)=>{
     const n = i+1, st = stepSt(n), open = openSt.has(n);
@@ -830,7 +843,7 @@ function lnRows(title, list, empty){
     return `<div class="active-row ${c}" data-lnopen="${esc(p.id)}" role="button" tabindex="0"><span class="name">${p.brand?brandTag(p.brand):''}${esc(p.name)}</span><span class="muted ln-meta">출시 ${p.launch.replace(/-/g,'.')}</span><span class="ln-bar" title="완료 ${p.done}/${p.total}"><i style="width:${pct(p.done,p.total)}%"></i></span><span class="tag ${c}">완료 ${p.done}/${p.total}${p.late?` · 지연 ${p.late}`:''}</span><span class="go">열기</span><button class="del" data-lndel="${esc(p.id)}" data-name="${esc(p.name)}">삭제</button></div>`; }).join('');
   return `<section class="active-jobs">${title?`<div class="active-head">${title} <span class="count-badge">${list.length}</span></div>`:''}${rows || (empty?`<p class="active-empty">${empty}</p>`:'')}</section>`;
 }
-async function openProduct(id){
+async function openProduct(id){ promoList = null;
   await flush();
   PID = id; S = null; lookingUp = false; lookErr = ''; VER = 0; rev = savedRev = 0; dirty = false; saveErr = '';
   calMonth = null; calSel = null; expSel = 'all'; expEdit = ''; expMonth = null; expHide = {}; calHide = {}; CF = {}; openCol = null; editPeriod = -1; delPlat = -1; perfCp = 'W1'; resetArm = false;
@@ -866,7 +879,7 @@ async function delProduct(id, name){
 /* ---------- 시작 ---------- */
 try{ const t=localStorage.getItem('fleur-launch-tab'); if(t && TABS.some(x=>x[0]===t)) tab=t; }catch(_){}
 // 사이드바·홈에서 이 화면을 열면 늘 제품 목록부터 (보던 제품의 남은 변경은 먼저 저장)
-window.launchOpen = async function(){
+window.launchOpen = async function(){ promoList = null;
   if(!ROOT.dataset.ready){ shell(); ROOT.dataset.ready = '1'; }
   await flush();
   showList(); window.scrollTo(0,0);

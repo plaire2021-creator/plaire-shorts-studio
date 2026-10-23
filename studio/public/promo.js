@@ -20,6 +20,9 @@
   window.promoPhase = phase;
   window.promoPeriod = period;
   window.promoChKey = CH_KEY;
+  // 옵션코드가 같은 제품(앞부분이 같으면 같은 제품: '블랑누아거실장2600' ↔ '블랑누아거실장2600/화이트월넛')
+  const sameCode = (a, b) => { a = String(a || "").trim(); b = String(b || "").trim(); return !!a && !!b && (a.startsWith(b) || b.startsWith(a)); };
+  window.promoSameCode = sameCode;
   if (!V) return;
 
   let data = null, err = "", openPast = {}, edit = null; // edit = 고치는 중인 기획전 사본 (새로 만들 땐 id 없음)
@@ -30,8 +33,10 @@
     if (!r.ok) throw new Error(j.error || "서버에 연결하지 못했어요");
     return j;
   }
+  let launches = []; // 신제품 출시 매뉴얼 제품 {name, code}: 옵션코드를 넣으면 제품명을 채워 준다
   async function load() {
     try { data = await getJSON("/api/promos"); err = ""; } catch (e) { err = e.message; }
+    try { launches = (await getJSON("/api/launch/products")).products.filter((p) => p.code); } catch {}
   }
   window.promoOpen = async function () {
     await load();
@@ -43,7 +48,7 @@
     return `<button class="pm-card ${p.past ? "past" : ""}" data-open="${it.id}">
       <span class="pm-top"><b>${esc(it.name)}</b><span class="pm-pill ${p.k}">${esc(p.t)}</span></span>
       <span class="pm-date">${period(it)}</span>
-      ${pr.length ? `<span class="pm-prods">${pr.slice(0, 3).map((x) => `<i>${esc(x)}</i>`).join("")}${pr.length > 3 ? `<i class="more">+${pr.length - 3}</i>` : ""}</span>` : ""}
+      ${pr.length ? `<span class="pm-prods">${pr.slice(0, 3).map((x) => `<i title="${esc(x.code)}">${esc(x.name || x.code)}</i>`).join("")}${pr.length > 3 ? `<i class="more">+${pr.length - 3}</i>` : ""}</span>` : ""}
       ${it.memo || it.owner ? `<span class="pm-foot"><span>${esc((it.memo || "").split("\n").pop())}</span>${it.owner ? `<em>${esc(it.owner)}</em>` : ""}</span>` : ""}
     </button>`;
   }
@@ -71,13 +76,16 @@
         </div>
         <div class="pm-f"><span>신청 상태</span><div class="pm-seg st">${st.map((s) => `<button type="button" class="${e.status === s ? "on" : ""}" data-set="status" data-v="${s}">${s}</button>`).join("")}</div></div>
         <div class="pm-f"><span>${e.status === "선정" ? "선정 제품" : "신청 제품"}</span>
-          <div class="pm-chips">${e.products.map((p, i) => `<span>${esc(p)}<button type="button" data-delp="${i}" aria-label="${esc(p)} 빼기">✕</button></span>`).join("")}<input id="pmProd" placeholder="${e.products.length ? "" : "제품명 쓰고 Enter"}"></div></div>
-        <div class="pm-f2">
-          <label class="pm-f"><span>담당</span><select data-f="owner"><option value="">-</option>${mem.map((m) => `<option ${e.owner === m ? "selected" : ""}>${m}</option>`).join("")}</select></label>
-          <label class="pm-f"><span>링크</span><input data-f="link" value="${esc(e.link)}" placeholder="기획전·신청 페이지 주소"></label>
+          ${e.products.length ? `<div class="pm-plist">${e.products.map((p, i) => `<span class="pm-pi"><b>${esc(p.name || "-")}</b><code>${esc(p.code || "코드 없음")}</code><button type="button" data-delp="${i}" aria-label="${esc(p.name || p.code)} 빼기">✕</button></span>`).join("")}</div>` : ""}
+          <div class="pm-prow"><input id="pmCode" placeholder="옵션코드" list="pmCodes"><input id="pmName" placeholder="제품명"><button type="button" class="btn" id="pmAddP">추가</button></div>
+          <datalist id="pmCodes">${launches.map((l) => `<option value="${esc(l.code)}">${esc(l.name)}</option>`).join("")}</datalist></div>
+        <div class="pm-f2 even">
+          <label class="pm-f"><span>기획전 링크${e.link ? ` <a href="${esc(e.link)}" target="_blank" rel="noopener">열기 ↗</a>` : ""}</span><input data-f="link" value="${esc(e.link)}" placeholder="기획전 페이지 주소"></label>
+          <label class="pm-f"><span>신청 링크${e.apply_link ? ` <a href="${esc(e.apply_link)}" target="_blank" rel="noopener">열기 ↗</a>` : ""}</span><input data-f="apply_link" value="${esc(e.apply_link)}" placeholder="신청·제출 페이지 주소"></label>
         </div>
+        <div class="pm-f"><span>담당</span><div class="pm-seg">${["", ...mem].map((m) => `<button type="button" class="${(e.owner || "") === m ? "on" : ""}" data-set="owner" data-v="${m}">${m || "미정"}</button>`).join("")}</div></div>
         <label class="pm-f"><span>진행 메모</span><textarea data-f="memo" rows="3" placeholder="예) 10/24 쿠폰 세팅 완료, 배너 시안 요청">${esc(e.memo)}</textarea></label>
-        <div class="pm-dfoot">${e.id ? `<button type="button" class="pm-del" id="pmDel">삭제</button>` : ""}${e.id && e.link ? `<a class="pm-lnk" href="${esc(e.link)}" target="_blank" rel="noopener">링크 열기 ↗</a>` : ""}<span></span><button type="button" class="btn" data-close>취소</button><button class="btn pm-save">저장</button></div>
+        <div class="pm-dfoot">${e.id ? `<button type="button" class="pm-del" id="pmDel">삭제</button>` : ""}<span></span><button type="button" class="btn" data-close>취소</button><button class="btn pm-save">저장</button></div>
       </form>
     </div>`;
   }
@@ -93,13 +101,12 @@
     V.querySelectorAll("[data-f]").forEach((i) => (edit[i.dataset.f] = i.value));
   }
   function addProduct() {
-    const i = V.querySelector("#pmProd");
-    const v = i?.value.trim();
-    if (!v) return false;
+    const code = V.querySelector("#pmCode")?.value.trim() || "", name = V.querySelector("#pmName")?.value.trim() || "";
+    if (!code && !name) return false;
     grab();
-    for (const p of v.split(/[,\n]/).map((x) => x.trim()).filter(Boolean)) if (!edit.products.includes(p)) edit.products.push(p);
+    if (!edit.products.some((p) => (code && p.code === code) || (!code && p.name === name))) edit.products.push({ code, name });
     render();
-    V.querySelector("#pmProd")?.focus();
+    V.querySelector("#pmCode")?.focus();
     return true;
   }
 
@@ -107,7 +114,7 @@
     const t = e.target;
     if (t.classList.contains("pm-modal") || t.closest("button[data-close]")) { edit = null; return render(); }
     const add = t.closest("[data-add]");
-    if (add) { edit = { ch: add.dataset.add, name: "", start: "", end: "", apply_by: "", status: "신청 전", products: [], owner: "", link: "", memo: "" }; render(); return V.querySelector('[data-f="name"]')?.focus(); }
+    if (add) { edit = { ch: add.dataset.add, name: "", start: "", end: "", apply_by: "", status: "신청 전", products: [], owner: "", link: "", apply_link: "", memo: "" }; render(); return V.querySelector('[data-f="name"]')?.focus(); }
     const op = t.closest("[data-open]");
     if (op) { const it = data.items.find((x) => x.id === op.dataset.open); edit = JSON.parse(JSON.stringify({ ...it, products: it.products || [] })); return render(); }
     const pb = t.closest("[data-past]");
@@ -116,6 +123,7 @@
     if (set) { grab(); edit[set.dataset.set] = set.dataset.v; return render(); }
     const dp = t.closest("[data-delp]");
     if (dp) { grab(); edit.products.splice(Number(dp.dataset.delp), 1); return render(); }
+    if (t.closest("#pmAddP")) return addProduct();
     if (t.closest("#pmDel")) {
       if (!confirm(`'${edit.name}' 기획전을 지울까요?`)) return;
       try { await getJSON("/api/promos/" + edit.id, { method: "DELETE" }); edit = null; await load(); } catch (er) { alert(er.message); }
@@ -123,15 +131,20 @@
     }
   });
   V.addEventListener("keydown", (e) => {
-    if (e.target.id === "pmProd" && e.key === "Enter") { e.preventDefault(); addProduct(); }
-    if (e.target.id === "pmProd" && e.key === "Backspace" && !e.target.value && edit.products.length) { grab(); edit.products.pop(); render(); V.querySelector("#pmProd")?.focus(); }
+    if ((e.target.id === "pmCode" || e.target.id === "pmName") && e.key === "Enter") { e.preventDefault(); addProduct(); }
     if (e.key === "Escape" && edit) { edit = null; render(); }
+  });
+  // 옵션코드를 치면 출시 매뉴얼에 있는 제품은 제품명이 자동으로 들어간다 (직접 쓴 이름은 그대로)
+  V.addEventListener("input", (e) => {
+    if (e.target.id !== "pmCode") return;
+    const n = V.querySelector("#pmName"), hit = launches.find((l) => sameCode(e.target.value, l.code));
+    if (n && (!n.value || n.dataset.auto)) { n.value = hit ? hit.name : ""; n.dataset.auto = hit ? "1" : ""; }
   });
   V.addEventListener("submit", async (e) => {
     e.preventDefault();
     addProduct();
     grab();
-    const body = { ch: edit.ch, name: edit.name, start: edit.start, end: edit.end, apply_by: edit.apply_by, status: edit.status, products: edit.products, owner: edit.owner, link: edit.link, memo: edit.memo };
+    const body = { ch: edit.ch, name: edit.name, start: edit.start, end: edit.end, apply_by: edit.apply_by, status: edit.status, products: edit.products, owner: edit.owner, link: edit.link, apply_link: edit.apply_link, memo: edit.memo };
     if (body.start && body.end && body.end < body.start) return alert("끝나는 날이 시작일보다 빨라요");
     try {
       await getJSON(edit.id ? "/api/promos/" + edit.id : "/api/promos", { method: edit.id ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });

@@ -662,3 +662,13 @@ body.remote .local-only{display:none!important}
 .hd-pr-d{font-size:12.5px;color:var(--sub);font-variant-numeric:tabular-nums}
 .hd-pr .pm-pill{justify-self:end}
 @media (max-width:860px){.hd-pr{grid-template-columns:1fr auto}.hd-pr-ch,.hd-pr-d{grid-column:1}}
+.pm-f2.even{grid-template-columns:1fr 1fr}
+.pm-f>span:first-child a{font-weight:600;color:var(--blue);text-decoration:none;margin-left:4px}
+.pm-plist{display:grid;gap:4px}
+.pm-pi{display:flex;align-items:center;gap:8px;background:#f6f7f9;border-radius:8px;padding:6px 6px 6px 10px;font-size:13px}
+.pm-pi b{font-weight:600}
+.pm-pi code{font:inherit;font-size:12px;color:var(--sub)}
+.pm-pi button{margin-left:auto;border:0;background:none;color:var(--faint);cursor:pointer;font-size:11px;padding:2px 6px}
+.pm-prow{display:grid;grid-template-columns:1fr 1fr auto;gap:6px}
+.pm-prow .btn{padding:7px 14px;font-size:13px}
+@media (max-width:980px){.pm-f2.even{grid-template-columns:1fr}}

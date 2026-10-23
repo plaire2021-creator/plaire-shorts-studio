@@ -564,3 +564,14 @@
 #launchView .ds-kpi .v small{font-size:13px;font-weight:600;color:var(--sub);margin-left:2px}
 #launchView .ds-kpi .bar{display:block}
 @media (max-width:900px){#launchView .ds-sum.ds-sum3{grid-template-columns:1fr 1fr}#launchView .ds-sum3 .dm{grid-column:1/-1}}
+/* 대시보드: 이 제품이 들어간 기획전 */
+#launchView .ln-promo .ds-head{display:flex;align-items:center;justify-content:space-between}
+#launchView .ln-promo .linkbtn{text-decoration:none;font-size:12.5px}
+#launchView .ln-prs{display:grid}
+#launchView .ln-pr{display:grid;grid-template-columns:auto 90px 1fr 190px 120px;gap:10px;align-items:center;padding:9px 2px;border-top:1px solid var(--line);text-decoration:none;color:inherit;font-size:13.5px}
+#launchView .ln-pr:first-child{border-top:0}
+#launchView .ln-pr.past{opacity:.55}
+#launchView .ln-pr-ch,#launchView .ln-pr-d{font-size:12.5px;color:var(--sub)}
+#launchView .ln-pr b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#launchView .ln-pr .pm-pill{justify-self:end}
+@media (max-width:860px){#launchView .ln-pr{grid-template-columns:auto 1fr auto}#launchView .ln-pr-ch,#launchView .ln-pr-d{display:none}}
