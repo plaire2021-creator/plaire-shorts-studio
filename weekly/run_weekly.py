@@ -243,6 +243,12 @@ def main():
     if run("verify_master.py", "--company", company, "--prev", prev_master, "--new", new_master, "--weekly", out) != 0:
         die("통합파일 검증 불일치. 구글 시트에는 쓰지 않았습니다.", 1)
 
+    # 공통 서식(글꼴·크기·테두리·정렬)으로 맞춘 뒤 구글 시트에 올린다 → 엑셀·시트·월간 파일이 같은 모양
+    import sheet_style
+    for p in (out, new_master):
+        sheet_style.normalize_file(p)
+    print("  서식 맞춤: 주간파일·통합파일")
+
     # 6) 구글 시트 교체 + 전 칸 대조
     if not a.no_sheet:
         print("\n[5/5] 구글 시트를 통합파일과 똑같이 교체 + 전 칸 대조")

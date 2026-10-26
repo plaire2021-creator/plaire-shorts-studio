@@ -435,6 +435,13 @@ def main():
     import build_total
     bad_c, n_c, total_file = build_total.build(company, month, master)
 
+    # 공통 서식(글꼴·크기·테두리·정렬) — 주간 파일·구글 시트와 같은 모양으로
+    import sheet_style
+    for p in (monthly, master, total_file):
+        if p and os.path.exists(p):
+            sheet_style.normalize_file(p)
+    print("[8] 서식 맞춤: 월간파일·통합파일·토탈")
+
     total = n_a + n_b + n_c
     bad = bad_a + bad_b + bad_c
     print("\n[요약]")
