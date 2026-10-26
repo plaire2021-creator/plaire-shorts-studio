@@ -727,3 +727,19 @@ body.remote .local-only{display:none!important}
 .hp-rowadd .hp-in{max-width:280px}
 .hp-common{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--sub);white-space:nowrap}
 @media (hover:none){.hp-acts{opacity:1}}
+/* 홈 오늘 리뷰: 직접 고치기 */
+.hd-rv{position:relative}
+.hd-rv-ed{position:absolute;top:10px;right:10px;border:0;background:none;color:var(--faint);font-size:12px;padding:3px 6px;border-radius:6px;cursor:pointer;opacity:0;transition:opacity .12s}
+.hd-rv:hover .hd-rv-ed,.hd-rv-ed:focus-visible{opacity:1}
+.hd-rv-ed:hover{background:#f1f2f5;color:var(--ink)}
+@media (hover:none){.hd-rv-ed{opacity:1}}
+.hd-rv-hand{font-style:normal;font-size:10.5px;font-weight:600;color:var(--sub);background:#f1f2f5;border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:1px}
+.hd-rv.editing{gap:8px;border-color:var(--blue)}
+.hd-rv-f{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--sub)}
+.hd-rv-f span{width:52px}
+.hd-rv-f input{width:64px;border:1px solid var(--line-2);border-radius:7px;padding:4px 8px;font:inherit;font-size:13.5px;text-align:right}
+.hd-rv-f input:focus{outline:2px solid var(--blue-soft);border-color:var(--blue)}
+.hd-rv-c{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--sub)}
+.hd-rv-act{display:flex;gap:4px;align-items:center}
+.hd-rv-act>span{flex:1}
+.hd-lk.on{background:var(--ink);border-color:var(--ink);color:#fff}

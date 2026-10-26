@@ -19,9 +19,11 @@
     return j;
   }
   // 오늘 리뷰: '리뷰 답글 작성 도우미'에 오늘 넣은 스마트스토어 리뷰 엑셀 기록(브랜드별, 같은 파일은 한 번만)
-  let revs = null;
+  // 직접 고친 값(revHand)이 있으면 그걸 먼저 보여 준다. rvEdit = 고치는 중인 브랜드
+  let revs = null, revHand = {}, rvEdit = null;
   async function loadReviews() {
     try { revs = await getJSON("/api/reviews/runs"); } catch { revs = []; }
+    try { revHand = await getJSON("/api/review-day?date=" + iso(new Date())); } catch { revHand = {}; }
   }
   let promos = null;
   async function loadPromos() {
@@ -46,7 +48,7 @@
     render();
     clearInterval(timer);
     timer = setInterval(async () => {
-      if (D.closest(".hidden") || editing) return;
+      if (D.closest(".hidden") || editing || rvEdit) return;
       await Promise.all([loadPlan(), loadReviews(), loadPromos()]);
       render();
       window.homeCal?.refresh();
@@ -87,22 +89,51 @@
     const today = iso(new Date());
     const runs = (revs || []).filter((r) => r.started_at && iso(new Date(r.started_at)) === today);
     const panel = (brand) => {
+      const dot = `<i class="dot ${brand === "플레르가구" ? "pl" : "gz"}"></i>${BR[brand]}`, hand = revHand[brand];
+      if (rvEdit === brand) {
+        const v = hand || autoOf(brand) || { total: "", low: "", replied: false };
+        return `<div class="hd-rv editing"><span class="hd-rv-b">${dot}</span>
+          <label class="hd-rv-f"><span>리뷰</span><input type="number" min="0" inputmode="numeric" data-rvf="total" value="${v.total ?? ""}">건</label>
+          <label class="hd-rv-f"><span>5점 미만</span><input type="number" min="0" inputmode="numeric" data-rvf="low" value="${v.low ?? ""}">건</label>
+          <label class="hd-rv-c"><input type="checkbox" data-rvf="replied" ${v.replied ? "checked" : ""}>답글 완료</label>
+          <span class="hd-rv-act">${hand ? `<button class="hd-lk" data-rvclear="${brand}" title="직접 고친 값을 지우고 리뷰 답글 도우미 기록으로">자동으로</button>` : ""}<span></span><button class="hd-lk" data-rvcancel>취소</button><button class="hd-lk on" data-rvsave="${brand}">저장</button></span></div>`;
+      }
+      const edit = `<button class="hd-rv-ed" data-rvedit="${brand}" title="직접 고치기" aria-label="${BR[brand]} 오늘 리뷰 직접 고치기">✎</button>`;
+      if (hand)
+        return `<div class="hd-rv">${edit}<span class="hd-rv-b">${dot}<em class="hd-rv-hand">직접 입력</em></span><b>${hand.total}<small>건</small></b>
+          <span class="hd-rv-s">${hand.low ? `<em class="low">5점 미만 ${hand.low}건</em>` : "모두 5점"} · ${hand.replied ? "답글 완료" : "답글 미완료"}</span></div>`;
       const seen = new Map();
       for (const r of runs.filter((r) => r.brand === brand)) {
         const k = r.source || r.id, o = seen.get(k);
         if (!o || (o.status !== "done" && r.status === "done")) seen.set(k, r);
       }
       const list = [...seen.values()];
-      if (!list.length) return `<div class="hd-rv none"><span class="hd-rv-b"><i class="dot ${brand === "플레르가구" ? "pl" : "gz"}"></i>${BR[brand]}</span><b>-</b><span class="hd-rv-s">아직 확인 전</span></div>`;
+      if (!list.length) return `<div class="hd-rv none">${edit}<span class="hd-rv-b">${dot}</span><b>-</b><span class="hd-rv-s">아직 확인 전</span></div>`;
       const total = list.reduce((s, r) => s + (r.total || 0), 0), low = list.reduce((s, r) => s + (r.low || 0), 0);
       const busy = list.some((r) => r.running), done = list.every((r) => r.status === "done");
-      return `<div class="hd-rv"><span class="hd-rv-b"><i class="dot ${brand === "플레르가구" ? "pl" : "gz"}"></i>${BR[brand]}</span><b>${total}<small>건</small></b>
+      return `<div class="hd-rv">${edit}<span class="hd-rv-b">${dot}</span><b>${total}<small>건</small></b>
         <span class="hd-rv-s">${low ? `<em class="low">5점 미만 ${low}건</em>` : "모두 5점"} · ${busy ? "답글 쓰는 중" : done ? "답글 완료" : "답글 미완료"}</span></div>`;
     };
     return `<section class="card hd-card">
       <div class="hd-head"><h2>오늘 리뷰</h2><span class="muted">${md(today)} 스마트스토어</span><a class="hd-more" href="#/review-reply">리뷰 답글 열기</a></div>
       <div class="hd-rvs">${panel("플레르가구")}${panel("가즈다가구")}</div>
     </section>`;
+  }
+
+  // 리뷰 답글 도우미 기록으로 센 값 (고치는 창을 열 때 처음 값으로 쓴다)
+  function autoOf(brand) {
+    const today = iso(new Date()), seen = new Map();
+    for (const r of (revs || []).filter((r) => r.brand === brand && r.started_at && iso(new Date(r.started_at)) === today)) seen.set(r.source || r.id, r);
+    const list = [...seen.values()];
+    if (!list.length) return null;
+    return { total: list.reduce((s, r) => s + (r.total || 0), 0), low: list.reduce((s, r) => s + (r.low || 0), 0), replied: list.every((r) => r.status === "done") };
+  }
+  async function saveReview(brand, clear) {
+    const f = (k) => D.querySelector(`[data-rvf="${k}"]`);
+    const body = clear ? { clear: true } : { total: f("total")?.value, low: f("low")?.value, replied: !!f("replied")?.checked };
+    try { revHand = await getJSON("/api/review-day", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: iso(new Date()), brand, ...body }) }); rvEdit = null; }
+    catch (er) { alert(er.message); }
+    render();
   }
 
   // ---------- 기획전 일정 (기획전 관리에서 끝나지 않은 것만) ----------
@@ -167,6 +198,13 @@
   }
 
   D.addEventListener("click", async (e) => {
+    const rv = e.target.closest("[data-rvedit]");
+    if (rv) { rvEdit = rv.dataset.rvedit; render(); return D.querySelector('[data-rvf="total"]')?.select(); }
+    if (e.target.closest("[data-rvcancel]")) { rvEdit = null; return render(); }
+    const rs = e.target.closest("[data-rvsave]");
+    if (rs) return saveReview(rs.dataset.rvsave);
+    const rc = e.target.closest("[data-rvclear]");
+    if (rc) return saveReview(rc.dataset.rvclear, true);
     const mv = e.target.closest("[data-mv]");
     if (mv) {
       const [y, m] = month.split("-").map(Number);
@@ -199,6 +237,8 @@
   D.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && e.target.closest("[data-tg]")) D.querySelector("[data-gsave]")?.click();
     if (e.key === "Escape" && editing) { editing = null; render(); }
+    if (e.target.closest("[data-rvf]") && e.key === "Enter" && !e.isComposing) { e.preventDefault(); saveReview(rvEdit); }
+    if (e.key === "Escape" && rvEdit) { rvEdit = null; render(); }
   });
 
   if (!location.hash.replace(/^#\/?/, "")) window.homeDashOpen();

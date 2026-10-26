@@ -24,6 +24,7 @@ import * as plans from "./lib/plans.js";
 import * as goals from "./lib/goals.js";
 import * as promos from "./lib/promos.js";
 import * as events from "./lib/events.js";
+import * as reviewday from "./lib/reviewday.js";
 
 const PORT = Number(process.env.PORT || loadConfig().port || 4173);
 tiktok.setPort(PORT);
@@ -302,6 +303,22 @@ const blogView = (r) => {
   if (r.status === "running" && !live && !alive(r.server_pid)) return { ...r, status: "failed", error: "스튜디오가 꺼져서 중단됐어요. 다시 넣어 주세요" };
   return { ...r, running: live || (r.status === "running" && alive(r.server_pid)) };
 };
+// ---------- 홈 '오늘 리뷰' 직접 고친 값 ----------
+app.get("/api/review-day", (req, res) => {
+  try {
+    res.json(reviewday.get(String(req.query.date || "")));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+app.put("/api/review-day", (req, res) => {
+  try {
+    const { date, brand, ...rest } = req.body || {};
+    res.json(reviewday.set(date, brand, rest));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
 // ---------- 홈 캘린더: 직접 넣는 일정 ----------
 app.get("/api/events", (req, res) => res.json({ items: events.list() }));
 app.post("/api/events", (req, res) => {
