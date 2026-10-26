@@ -395,6 +395,21 @@ app.patch("/api/plans/:id/item", (req, res) => {
     res.status(400).json({ error: e.message });
   }
 });
+// 업무·항목 직접 추가·수정·삭제
+for (const [m, url, fn] of [
+  ["post", "/api/plans/:id/item", (q) => plans.addItem(q.params.id, q.body || {})],
+  ["delete", "/api/plans/:id/item/:item", (q) => plans.deleteItem(q.params.id, q.params.item)],
+  ["post", "/api/plans/:id/row", (q) => plans.addRow(q.params.id, q.body || {})],
+  ["patch", "/api/plans/:id/row", (q) => plans.patchRow(q.params.id, q.body || {})],
+  ["delete", "/api/plans/:id/row/:row", (q) => plans.deleteRow(q.params.id, q.params.row)],
+])
+  app[m](url, (req, res) => {
+    try {
+      res.json(fn(req));
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
 app.patch("/api/plans/:id/leave", (req, res) => {
   try {
     res.json(plans.setLeave(req.params.id, req.body || {}));

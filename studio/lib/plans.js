@@ -29,6 +29,11 @@ export function load(id) {
   }
   // 1.34.0 휴가 형식({on, memo}) → 날짜별({days, note})
   p.leave = (p.leave || []).map((l) => (l.days ? l : { name: l.name, days: {}, note: l.on ? l.memo || "휴가" : "" }));
+  // 1.44.0 전 자료엔 행 id가 없다 → 붙여서 저장해 둔다 (화면·서버가 같은 id를 쓰게)
+  if (p.rows.some((r) => !r.id)) {
+    for (const r of p.rows) r.id ||= crypto.randomBytes(3).toString("hex");
+    write(p);
+  }
   return p;
 }
 export function list() {
@@ -85,6 +90,15 @@ export async function importXlsx(xlsx, name) {
     const f = r.leave.find((l) => l.name === n);
     return { name: n, days: p?.days || {}, note: p ? p.note || "" : f ? f.kind : "" };
   });
+  const rows = r.rows.map((row) => ({ id: crypto.randomBytes(3).toString("hex"), cat: row.cat, note: row.note, ref: row.ref, common: row.common, plaire: row.plaire.map(mk(row.cat, "plaire")), gazda: row.gazda.map(mk(row.cat, "gazda")) }));
+  // 화면에서 직접 넣은 업무·항목(manual)은 같은 주 엑셀을 다시 올려도 남긴다
+  if (prev)
+    for (const pr of prev.rows) {
+      let row = rows.find((x) => x.cat === pr.cat);
+      if (!row && pr.manual) rows.push((row = { ...pr, plaire: [], gazda: [] }));
+      if (!row) continue;
+      for (const side of ["plaire", "gazda"]) for (const it of pr[side]) if (it.manual && !row[side].some((x) => x.t === it.t)) row[row.common ? "plaire" : side].push(it);
+    }
   const plan = {
     id,
     title: r.title || "주간업무 계획표",
@@ -93,12 +107,12 @@ export async function importXlsx(xlsx, name) {
     file: name,
     uploaded_at: now(),
     leave,
-    rows: r.rows.map((row) => ({ cat: row.cat, note: row.note, ref: row.ref, common: row.common, plaire: row.plaire.map(mk(row.cat, "plaire")), gazda: row.gazda.map(mk(row.cat, "gazda")) })),
+    rows,
   };
   return write(plan);
 }
 
-export function patchItem(id, { item, done, link }) {
+export function patchItem(id, { item, done, link, t }) {
   const p = load(id);
   for (const row of p.rows)
     for (const side of ["plaire", "gazda"])
@@ -109,10 +123,70 @@ export function patchItem(id, { item, done, link }) {
             it.done_at = it.done ? now() : "";
           }
           if (link !== undefined) it.link = String(link).trim().slice(0, 1000);
+          if (t !== undefined) {
+            const v = String(t).trim().slice(0, 300);
+            if (!v) throw new Error("업무 내용을 적어 주세요");
+            it.t = v;
+          }
           write(p);
           return it;
         }
   throw new Error("업무를 찾지 못했어요");
+}
+
+// ---------- 업무·항목 직접 추가·삭제 (화면에서) ----------
+const rowOf = (p, rid) => {
+  const r = p.rows.find((x) => x.id === rid);
+  if (!r) throw new Error("항목을 찾지 못했어요");
+  return r;
+};
+export function addItem(id, { row, side, t }) {
+  const p = load(id), r = rowOf(p, row);
+  const v = String(t || "").trim().slice(0, 300);
+  if (!v) throw new Error("업무 내용을 적어 주세요");
+  const s = r.common || side !== "gazda" ? "plaire" : "gazda";
+  const it = { id: crypto.randomBytes(4).toString("hex"), t: v, link: "", done: false, done_at: "", manual: true };
+  r[s].push(it);
+  write(p);
+  return it;
+}
+export function deleteItem(id, item) {
+  const p = load(id);
+  for (const r of p.rows)
+    for (const side of ["plaire", "gazda"]) {
+      const i = r[side].findIndex((x) => x.id === item);
+      if (i >= 0) {
+        r[side].splice(i, 1);
+        write(p);
+        return { ok: true };
+      }
+    }
+  throw new Error("업무를 찾지 못했어요");
+}
+export function addRow(id, { cat, common }) {
+  const p = load(id);
+  const v = String(cat || "").trim().slice(0, 40);
+  if (!v) throw new Error("항목 이름을 적어 주세요");
+  if (p.rows.some((x) => x.cat === v)) throw new Error("같은 이름의 항목이 이미 있어요");
+  const r = { id: crypto.randomBytes(3).toString("hex"), cat: v, note: "", ref: "", common: !!common, plaire: [], gazda: [], manual: true };
+  p.rows.push(r);
+  write(p);
+  return r;
+}
+export function patchRow(id, { row, cat }) {
+  const p = load(id), r = rowOf(p, row);
+  const v = String(cat || "").trim().slice(0, 40);
+  if (!v) throw new Error("항목 이름을 적어 주세요");
+  if (p.rows.some((x) => x !== r && x.cat === v)) throw new Error("같은 이름의 항목이 이미 있어요");
+  r.cat = v;
+  write(p);
+  return r;
+}
+export function deleteRow(id, row) {
+  const p = load(id), r = rowOf(p, row);
+  p.rows.splice(p.rows.indexOf(r), 1);
+  write(p);
+  return { ok: true };
 }
 
 // 휴가 하루 바꾸기: kind = '연차' | '반차' | '' (지우기). 날짜를 하나라도 고르면 엑셀에서 온 '날짜 미정' 표시는 지운다

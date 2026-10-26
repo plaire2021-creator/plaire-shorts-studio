@@ -8,6 +8,9 @@
   const md = (d) => { const t = new Date(d + "T00:00:00"); return `${t.getMonth() + 1}/${t.getDate()}(${WD[t.getDay()]})`; };
   const isUrl = (s) => /^https?:\/\/\S+$/i.test(String(s || "").trim());
   let list = [], cur = null, members = [], editing = null, busy = false, timer = null, err = "";
+  // 직접 고치기: tEdit = 내용 고치는 업무 id, adding = '행id|쪽' 업무 추가 중, catEdit = 이름 고치는 항목 id, rowAdd = 새 항목 입력 중
+  let tEdit = null, adding = null, catEdit = null, rowAdd = false;
+  const fixing = () => editing || tEdit || adding || catEdit || rowAdd;
 
   async function getJSON(url, opt) {
     const r = await fetch(url, opt);
@@ -27,21 +30,25 @@
     clearInterval(timer);
     // 다른 사람이 체크한 것도 보이게 30초마다 다시 읽는다 (고치는 중이면 건너뜀)
     timer = setInterval(async () => {
-      if (H.closest(".hidden") || busy || editing || document.activeElement?.closest("#homeBoard")) return;
+      if (H.closest(".hidden") || busy || fixing() || document.activeElement?.closest("#homeBoard")) return;
       try { await refresh(true); render(); } catch {}
     }, 30000);
   };
 
   function item(it) {
     const ed = editing === it.id;
+    if (tEdit === it.id) return `<div class="hp-it"><input class="hp-in" data-tedit="${it.id}" value="${esc(it.t)}" aria-label="업무 내용"></div>`;
     return `<div class="hp-it ${it.done ? "done" : ""}">
       <label class="hp-chk"><input type="checkbox" data-done="${it.id}" ${it.done ? "checked" : ""}><span>${esc(it.t)}</span></label>
+      <span class="hp-acts"><button class="hp-ic" data-topen="${it.id}" title="내용 고치기" aria-label="내용 고치기">✎</button><button class="hp-ic del" data-del="${it.id}" title="지우기" aria-label="지우기">✕</button></span>
       ${it.link && !ed ? (isUrl(it.link) ? `<a class="hp-open" href="${esc(it.link)}" target="_blank" rel="noopener">열기 ↗</a>` : `<span class="hp-ltxt" title="${esc(it.link)}">${esc(it.link)}</span>`) : ""}
-      ${ed ? `<input class="hp-link-in" data-link="${it.id}" value="${esc(it.link)}" placeholder="링크 붙여넣고 Enter">` : `<button class="hp-lk" data-editlink="${it.id}" title="${it.link ? "링크 바꾸기" : "링크 넣기"}">${it.link ? "✎" : "링크"}</button>`}
+      ${ed ? `<input class="hp-link-in" data-link="${it.id}" value="${esc(it.link)}" placeholder="링크 붙여넣고 Enter">` : `<button class="hp-lk" data-editlink="${it.id}" title="${it.link ? "링크 바꾸기" : "링크 넣기"}">링크</button>`}
     </div>`;
   }
-  function col(items, label) {
-    return `<div class="hp-col"><span class="hp-brand">${label}</span>${items.length ? items.map(item).join("") : '<span class="muted hp-none">이번 주 업무 없음</span>'}</div>`;
+  function col(items, label, row, side) {
+    const key = row.id + "|" + side;
+    return `<div class="hp-col"><span class="hp-brand">${label}</span>${items.length ? items.map(item).join("") : adding === key ? "" : '<span class="muted hp-none">이번 주 업무 없음</span>'}
+      ${adding === key ? `<div class="hp-it"><input class="hp-in" data-addto="${key}" placeholder="업무 쓰고 Enter (여러 개 연달아 가능)"></div>` : `<button class="hp-add" data-addopen="${key}">+ 업무 추가</button>`}</div>`;
   }
   // 휴가: 사람 × 요일 칸. 누를 때마다 연차 → 반차 → 비움
   function weekDays() {
@@ -96,10 +103,15 @@
         ${leaveLine()}
       </div>
       <div class="hp-board">${cur.rows.map((r) => `<section class="hp-row">
-        <div class="hp-cat"><b>${esc(r.cat)}</b></div>
-        <div class="hp-cols ${r.common ? "one" : ""}">${r.common ? col(r.plaire, "공통") : col(r.plaire, "플레르가구") + col(r.gazda, "가즈다가구")}</div>
-      </section>`).join("")}</div>`;
+        <div class="hp-cat">${catEdit === r.id ? `<input class="hp-in" data-catedit="${r.id}" value="${esc(r.cat)}" aria-label="항목 이름">`
+          : `<b>${esc(r.cat)}</b><span class="hp-acts"><button class="hp-ic" data-catopen="${r.id}" title="항목 이름 고치기" aria-label="항목 이름 고치기">✎</button><button class="hp-ic del" data-catdel="${r.id}" title="항목 지우기" aria-label="항목 지우기">✕</button></span>`}</div>
+        <div class="hp-cols ${r.common ? "one" : ""}">${r.common ? col(r.plaire, "공통", r, "plaire") : col(r.plaire, "플레르가구", r, "plaire") + col(r.gazda, "가즈다가구", r, "gazda")}</div>
+      </section>`).join("")}
+      ${rowAdd ? `<div class="hp-rowadd card"><input class="hp-in" id="hpRowName" placeholder="새 항목 이름 (예: 촬영, 기획전)"><label class="hp-common"><input type="checkbox" id="hpRowCommon">플레르·가즈다 공통</label><button class="hp-lk" id="hpRowSave">추가</button><button class="hp-lk" id="hpRowCancel">취소</button></div>`
+        : `<button class="hp-add row" id="hpRowOpen">+ 항목 추가</button>`}</div>`;
     if (editing) H.querySelector(`[data-link="${editing}"]`)?.focus();
+    const f = H.querySelector("[data-tedit],[data-addto],[data-catedit],#hpRowName");
+    if (f && document.activeElement !== f) { f.focus(); if (f.value) f.setSelectionRange(f.value.length, f.value.length); }
   }
 
   async function upload(f) {
@@ -127,7 +139,64 @@
     if (v !== find(el.dataset.link).link) patch(el.dataset.link, { link: v }); else render();
   }
 
+  const api = (url, method, body) => getJSON(`/api/plans/${cur.id}${url}`, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const rowById = (id) => cur.rows.find((r) => r.id === id);
+  async function saveText(el) {
+    const id = el.dataset.tedit, v = el.value.trim(), it = find(id);
+    tEdit = null;
+    if (!it || !v || v === it.t) return render();
+    await patch(id, { t: v });
+  }
+  async function addTo(el) {
+    const v = el.value.trim();
+    if (!v) return;
+    const [rid, side] = el.dataset.addto.split("|"), r = rowById(rid);
+    el.value = "";
+    try { const it = await api("/item", "POST", { row: rid, side, t: v }); r[r.common || side !== "gazda" ? "plaire" : "gazda"].push(it); }
+    catch (er) { alert(er.message); }
+    render();
+  }
+  async function saveCat(el) {
+    const r = rowById(el.dataset.catedit), v = el.value.trim();
+    catEdit = null;
+    if (!r || !v || v === r.cat) return render();
+    try { Object.assign(r, await api("/row", "PATCH", { row: r.id, cat: v })); } catch (er) { alert(er.message); }
+    render();
+  }
+  async function addRow() {
+    const v = H.querySelector("#hpRowName")?.value.trim(), common = !!H.querySelector("#hpRowCommon")?.checked;
+    if (!v) return;
+    try { const r = await api("/row", "POST", { cat: v, common }); cur.rows.push(r); rowAdd = false; adding = r.id + "|plaire"; }
+    catch (er) { alert(er.message); }
+    render();
+  }
+
   H?.addEventListener("click", async (e) => {
+    const t = e.target;
+    const to = t.closest("[data-topen]");
+    if (to) { tEdit = to.dataset.topen; adding = catEdit = null; return render(); }
+    const dl = t.closest("[data-del]");
+    if (dl) {
+      const it = find(dl.dataset.del);
+      if (!it || !confirm(`'${it.t}' 업무를 지울까요?`)) return;
+      try { await api("/item/" + it.id, "DELETE"); for (const r of cur.rows) for (const k of ["plaire", "gazda"]) r[k] = r[k].filter((x) => x.id !== it.id); }
+      catch (er) { alert(er.message); }
+      return render();
+    }
+    const ao = t.closest("[data-addopen]");
+    if (ao) { adding = ao.dataset.addopen; tEdit = catEdit = null; return render(); }
+    const co = t.closest("[data-catopen]");
+    if (co) { catEdit = co.dataset.catopen; tEdit = adding = null; return render(); }
+    const cd = t.closest("[data-catdel]");
+    if (cd) {
+      const r = rowById(cd.dataset.catdel), n = r.plaire.length + r.gazda.length;
+      if (!confirm(n ? `'${r.cat}' 항목과 그 안의 업무 ${n}개를 지울까요?` : `'${r.cat}' 항목을 지울까요?`)) return;
+      try { await api("/row/" + r.id, "DELETE"); cur.rows = cur.rows.filter((x) => x !== r); } catch (er) { alert(er.message); }
+      return render();
+    }
+    if (t.closest("#hpRowOpen")) { rowAdd = true; tEdit = adding = catEdit = null; return render(); }
+    if (t.closest("#hpRowCancel")) { rowAdd = false; return render(); }
+    if (t.closest("#hpRowSave")) return addRow();
     const lk = e.target.closest("[data-editlink]");
     if (lk) { editing = lk.dataset.editlink; render(); return; }
     if (e.target.closest("#lvOpen")) { lvForm = { name: cur.leave[0]?.name, date: weekDays()[0], kind: "연차" }; return render(); }
@@ -153,10 +222,23 @@
     if (el.dataset.lvf && lvForm) { lvForm[el.dataset.lvf] = el.value; if (el.dataset.lvf === "date") render(); }
   });
   H?.addEventListener("keydown", (e) => {
+    const d = e.target.dataset || {}, enter = e.key === "Enter" && !e.isComposing; // 한글 조합 중 Enter는 무시
+    if (d.tedit) { if (enter) { e.preventDefault(); saveText(e.target); } if (e.key === "Escape") { tEdit = null; render(); } return; }
+    if (d.addto) { if (enter) { e.preventDefault(); addTo(e.target); } if (e.key === "Escape") { adding = null; render(); } return; }
+    if (d.catedit) { if (enter) { e.preventDefault(); saveCat(e.target); } if (e.key === "Escape") { catEdit = null; render(); } return; }
+    if (e.target.id === "hpRowName") { if (enter) { e.preventDefault(); addRow(); } if (e.key === "Escape") { rowAdd = false; render(); } return; }
     if (e.target.dataset?.link && e.key === "Enter" && !e.isComposing) { e.preventDefault(); saveLink(e.target); }
     if (e.target.dataset?.link && e.key === "Escape") { editing = null; render(); }
   });
-  H?.addEventListener("focusout", (e) => { if (e.target.dataset?.link && editing) saveLink(e.target); });
+  H?.addEventListener("focusout", (e) => {
+    const d = e.target.dataset || {};
+    if (d.link && editing) saveLink(e.target);
+    // 다른 곳을 누르면: 내용·이름 고치기는 저장, 비어 있는 추가 칸은 닫기 (버튼을 누르는 중이면 그 버튼이 처리)
+    if (e.relatedTarget && H.contains(e.relatedTarget) && e.relatedTarget.closest("button")) return;
+    if (d.tedit && tEdit) saveText(e.target);
+    if (d.catedit && catEdit) saveCat(e.target);
+    if (d.addto && adding && !e.target.value.trim()) { adding = null; render(); }
+  });
   // 엑셀을 홈 화면 어디에나 끌어다 놓으면 올린다
   H?.addEventListener("dragover", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { e.preventDefault(); H.classList.add("drag"); } });
   H?.addEventListener("dragleave", (e) => { if (!H.contains(e.relatedTarget)) H.classList.remove("drag"); });
