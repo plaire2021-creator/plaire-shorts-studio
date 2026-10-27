@@ -140,6 +140,41 @@ function show(ids) {
 }
 
 
+// 진행 중 '실행 취소': 멈추고 입력 화면으로 (영상 다시 만들기 중이면 전에 만든 영상으로)
+async function cancelRun(btn, what, fn) {
+  if (!confirm(`진행 중인 ${what}을(를) 취소할까요?\n지금까지 만든 내용은 남지 않아요.`)) return;
+  btn.disabled = true;
+  btn.textContent = "취소하는 중…";
+  try { await fn(); }
+  catch (e) { alert(e.message); }
+  btn.disabled = false;
+  btn.textContent = "실행 취소";
+}
+$("genCancel").onclick = (e) => cancelRun(e.currentTarget, current?.kind === "copy" ? "문구 쓰기" : "영상 만들기", async () => {
+  const id = current?.id;
+  if (!id) return;
+  clearInterval(poll);
+  const r = await api(`/api/jobs/${id}/cancel`, { method: "POST" });
+  if (r.deleted) newJob();
+  else openJob(id);
+});
+$("rvCancel").onclick = (e) => cancelRun(e.currentTarget, "답글 쓰기", async () => {
+  const id = rvRun?.id;
+  if (!id) return;
+  clearInterval(rvPoll);
+  await api(`/api/reviews/runs/${id}`, { method: "DELETE" });
+  rvReset();
+  api("/api/reviews/runs").then(rvHistory).catch(() => {});
+});
+$("blCancel").onclick = (e) => cancelRun(e.currentTarget, "블로그 글 쓰기", async () => {
+  const id = blRunNow?.id;
+  if (!id) return;
+  clearInterval(blPoll);
+  await api(`/api/blog/runs/${id}`, { method: "DELETE" });
+  blShowInput();
+  api("/api/blog/runs").then(blHistory).catch(() => {});
+});
+
 function newJob() {
   current = null;
   clearInterval(poll);

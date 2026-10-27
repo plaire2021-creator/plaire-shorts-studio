@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import multer from "multer";
 import { DATA_DIR, PLUGIN_ROOT, updateLocalConfig, jobDir, listJobs, loadConfig, loadJob, newJobId, saveConfig, saveJob, setToken } from "./lib/store.js";
-import { claudeAuth, claudeLoginUrl, findClaude, isRunning, isRunningAny, saveDetailImages, startClaudeLogin, startGeneration, stopGeneration, submitClaudeCode, switchClaudeAccount, unzipInto } from "./lib/generate.js";
+import { cancelGeneration, claudeAuth, claudeLoginUrl, findClaude, isRunning, isRunningAny, saveDetailImages, startClaudeLogin, startGeneration, stopGeneration, submitClaudeCode, switchClaudeAccount, unzipInto } from "./lib/generate.js";
 import * as youtube from "./lib/youtube.js";
 import * as instagram from "./lib/instagram.js";
 import * as tiktok from "./lib/tiktok.js";
@@ -551,6 +551,22 @@ app.put("/api/jobs/:id/meta", (req, res) => {
   res.json(view(saveJob(job)));
 });
 
+// 만드는 중인 영상 '실행 취소': 처음 만드는 중이면 작업째 지우고(입력 화면으로), 다시 만들기 중이면 전 영상으로 돌린다
+app.post("/api/jobs/:id/cancel", async (req, res) => {
+  const job = loadJob(req.params.id);
+  if (!job) return err(res, new Error("이미 지워진 영상이에요"), 404);
+  try {
+    await cancelGeneration(job.id);
+    const j = loadJob(job.id);
+    if (j && !(j.result?.video && fs.existsSync(j.result.video))) {
+      fs.rmSync(jobDir(job.id), { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+      return res.json({ ok: true, deleted: true });
+    }
+    res.json({ ok: true, deleted: false });
+  } catch (e) {
+    err(res, new Error("취소하지 못했어요: " + e.message));
+  }
+});
 app.delete("/api/jobs/:id", async (req, res) => {
   const job = loadJob(req.params.id);
   if (!job) return err(res, new Error("이미 지워진 영상이에요"), 404);

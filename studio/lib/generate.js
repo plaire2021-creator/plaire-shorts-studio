@@ -232,6 +232,14 @@ export function startGeneration(id, { revision } = {}) {
     running.delete(id);
     const j = loadJob(id);
     if (!j) return; // 작업이 지워짐
+    if (canceled.delete(id)) {
+      // 사람이 '실행 취소'를 누름: 전에 만든 영상이 있으면(다시 만들기 중) 그 영상으로 돌아간다
+      const had = j.result?.video && fs.existsSync(j.result.video);
+      j.status = had ? "ready" : "canceled";
+      j.error = had ? null : "실행을 취소했어요";
+      log(j, had ? "다시 만들기를 취소했어요 (전에 만든 영상은 그대로)" : "실행을 취소했어요");
+      return saveJob(j);
+    }
     let result = null;
     try {
       result = JSON.parse(fs.readFileSync(resultPath, "utf8"));
@@ -252,6 +260,14 @@ export function startGeneration(id, { revision } = {}) {
 }
 
 export const isRunning = (id) => running.has(id);
+const canceled = new Set();
+// '실행 취소': 멈추고 취소로 표시 (stopGeneration은 지우기 전에 멈출 때도 쓴다)
+export async function cancelGeneration(id) {
+  if (!running.has(id)) return false;
+  canceled.add(id);
+  await stopGeneration(id);
+  return true;
+}
 
 // 만드는 중인 영상을 멈춘다 (Claude가 띄운 렌더링 프로그램까지 함께 종료)
 export function stopGeneration(id) {

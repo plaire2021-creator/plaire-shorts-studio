@@ -743,3 +743,8 @@ body.remote .local-only{display:none!important}
 .hd-rv-act{display:flex;gap:4px;align-items:center}
 .hd-rv-act>span{flex:1}
 .hd-lk.on{background:var(--ink);border-color:var(--ink);color:#fff}
+/* 진행 중 '실행 취소' */
+.gen-load>div{flex:1;min-width:0}
+.gen-cancel{flex:none;margin-left:auto;border:1px solid #c9d6fb;background:#fff;color:var(--sub);border-radius:8px;padding:6px 12px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.gen-cancel:hover{border-color:var(--red);color:var(--red)}
+.gen-cancel:disabled{opacity:.6;cursor:default}
