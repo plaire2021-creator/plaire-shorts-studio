@@ -191,7 +191,7 @@
   function render() {
     const t = new Date();
     D.innerHTML = `<div class="hd-top"><img class="home-logo" src="img/plaire-logo.png" alt="PLAIRE FURNITURE"><span class="muted">${t.getMonth() + 1}월 ${t.getDate()}일 ${WD[t.getDay()]}요일</span></div>
-      <div class="hd-row">${planCard()}${reviewCard()}</div><div id="homeCalSlot"></div>${goals ? goalCard() : ""}${promos ? promoCard() : ""}`;
+      <div class="hd-row">${planCard()}${reviewCard()}</div><div id="homeCalSlot"></div>${promos ? promoCard() : ""}${goals ? goalCard() : ""}`;
     // 캘린더(homecal.js)는 따로 그려 둔 요소를 그대로 끼운다 (다시 그려도 보던 달·입력이 안 사라지게)
     const slot = D.querySelector("#homeCalSlot");
     if (slot && window.homeCal) slot.replaceWith(window.homeCal.el);
