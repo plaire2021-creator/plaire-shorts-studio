@@ -8,7 +8,7 @@
   const kd = (d) => { const t = new Date(d + "T00:00:00"); return `${t.getMonth() + 1}월 ${t.getDate()}일 (${WD[t.getDay()]})`; };
   const CH = { "스마트스토어": "#03c75a", "쿠팡": "#e5322d", "오늘의집": "#35b6e8" };
   const COLORS = [["#2f5bea", "파랑"], ["#1f9d55", "초록"], ["#c27803", "노랑"], ["#d93f3f", "빨강"], ["#7c4dff", "보라"], ["#e0529c", "분홍"], ["#0f9d9a", "청록"], ["#5b616e", "회색"]];
-  const LANES = 3; // 한 주에 보이는 줄 수 (넘치면 날짜 칸에 +n)
+  const LANES = 3; // 한 주에 보이는 줄 수 (넘치면 날짜 옆에 +n, 누르면 그날 일정 전부)
 
   const el = document.createElement("section");
   el.className = "card hd-card hc";
@@ -61,7 +61,7 @@
     }
     const today = iso(new Date());
     return `<div class="hc-week">
-      <div class="hc-bg">${days.map((d, i) => `<button class="hc-day ${d.slice(0, 7) !== m ? "out" : ""} ${d === today ? "today" : ""}" data-day="${d}" aria-label="${kd(d)} 일정 추가"><span class="hc-dn">${Number(d.slice(8))}</span>${more[i] ? `<span class="hc-more">+${more[i]}</span>` : ""}</button>`).join("")}</div>
+      <div class="hc-bg">${days.map((d, i) => `<button class="hc-day ${d.slice(0, 7) !== m ? "out" : ""} ${d === today ? "today" : ""}" data-day="${d}" aria-label="${kd(d)} 일정 추가"><span class="hc-dn">${Number(d.slice(8))}</span>${more[i] ? `<span class="hc-more" title="일정 ${more[i]}개 더 — 눌러서 모두 보기">+${more[i]}</span>` : ""}</button>`).join("")}</div>
       <div class="hc-bars">${placed.map(({ x, a, b, l }) => `<button class="hc-bar ${x.kind} ${x.s >= ws ? "first" : ""} ${x.e <= we ? "last" : ""}" style="grid-column:${a + 1}/span ${b - a + 1};grid-row:${l + 1};--c:${x.color}" ${x.id ? `data-ev="${x.id}"` : `data-href="${x.href}"`} title="${esc(x.label)}">${esc(x.label)}</button>`).join("")}</div>
     </div>`;
   }
