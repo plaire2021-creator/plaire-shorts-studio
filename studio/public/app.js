@@ -128,6 +128,24 @@ window.addEventListener("focus", () => loadStatus(true));
 
 // ---------- 화면 전환 ----------
 const uploadMode = () => route.current === "upload"; // 제작된 숏츠 업로드 화면
+// 숏츠 브랜드: 플레르가구(가정집) / 가즈다가구(사무실·식당 등 업체) — 엔딩 브랜드·CTA와 제목·설명글 타깃이 달라진다
+let shBrand = "플레르가구";
+try {
+  if (localStorage.getItem("shBrand") === "가즈다가구") shBrand = "가즈다가구";
+} catch {}
+function shSetBrand(b) {
+  shBrand = b;
+  try {
+    localStorage.setItem("shBrand", b);
+  } catch {}
+  for (const x of $("shSeg").querySelectorAll("button")) x.classList.toggle("on", x.dataset.br === b);
+}
+$("shSeg").onclick = (e) => {
+  const b = e.target.closest("[data-br]");
+  if (b) shSetBrand(b.dataset.br);
+};
+shSetBrand(shBrand);
+
 function show(ids) {
   if (["shorts", "upload"].includes(route.current)) $("crumb").textContent = ids.includes("settings") ? "숏츠 설정" : ids.includes("stepInput") ? (uploadMode() ? "새 업로드" : "새 영상") : current?.product_name || "영상";
   $("settingsBtn").classList.toggle("on", ids.includes("settings"));
@@ -136,6 +154,7 @@ function show(ids) {
   setTimeout(pauseHidden);
   // 입력 단계: 제작 화면은 사진 입력, 업로드 화면은 영상 입력
   $("stepCopyInput").classList.toggle("hidden", !(ids.includes("stepInput") && uploadMode()));
+  $("shSeg").classList.toggle("hidden", !ids.includes("stepInput"));
   if (uploadMode()) $("stepInput").classList.add("hidden");
 }
 
@@ -203,7 +222,7 @@ async function loadActive() {
     (list.length
       ? list.map((j) => {
         const [t, c] = j.status === "ready" ? (j.uploaded ? [`올림 · ${j.uploaded}곳`, "green"] : ["완성 · 올리기 전", "amber"]) : j.status === "failed" ? ["실패 · 열어서 다시 만들기", "red"] : [j.kind === "copy" ? "문구 쓰는 중" : "만드는 중", "amber"];
-        return `<div class="active-row ${c}" data-open="${j.id}" role="button" tabindex="0"><span class="name">${esc(j.product_name)}</span><span class="tag ${c}">${t}</span><span class="go">열기</span><button class="del" data-del="${j.id}" data-name="${esc(j.product_name)}" data-making="${j.status !== "ready" && j.status !== "failed" ? 1 : ""}">삭제</button></div>`;
+        return `<div class="active-row ${c}" data-open="${j.id}" role="button" tabindex="0"><span class="name"><em class="sh-br ${j.brand === "가즈다가구" ? "gz" : ""}">${j.brand === "가즈다가구" ? "가즈다" : "플레르"}</em>${esc(j.product_name)}</span><span class="tag ${c}">${t}</span><span class="go">열기</span><button class="del" data-del="${j.id}" data-name="${esc(j.product_name)}" data-making="${j.status !== "ready" && j.status !== "failed" ? 1 : ""}">삭제</button></div>`;
       }).join("")
       : `<p class="active-empty">${uploadMode() ? "아직 올린 영상이 없어요" : "아직 만든 영상이 없어요"}</p>`);
   const inputShown = !$("stepInput").classList.contains("hidden") || !$("stepCopyInput").classList.contains("hidden");
@@ -465,6 +484,7 @@ $("copyBtn").onclick = async () => {
   if (!copyVideo) return ($("copyErr").textContent = "올릴 영상 파일을 넣어 주세요");
   const fd = new FormData();
   fd.append("product_name", name);
+  fd.append("brand", shBrand);
   fd.append("video", copyVideo);
   $("copyBtn").disabled = true;
   $("copyBtn").textContent = "영상 보내는 중…";
@@ -487,6 +507,7 @@ $("createBtn").onclick = async () => {
   if (!product) return ($("inputErr").textContent = "제품 사진 폴더나 zip 파일을 넣어 주세요");
   const fd = new FormData();
   fd.append("product_name", name);
+  fd.append("brand", shBrand);
   for (const d of details) fd.append("detail", d.file);
   if (product.zip) fd.append("zip", product.zip);
   else {

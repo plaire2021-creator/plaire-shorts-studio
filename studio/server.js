@@ -226,6 +226,8 @@ app.post("/api/weekly/runs", upload.array("files", 10), (req, res) => {
   }
 });
 
+const shortsBrand = (b) => (b === "가즈다가구" ? "가즈다가구" : "플레르가구"); // 예전 작업·값 없음 = 플레르
+
 // 이미 만든 영상 올리기: 영상 1개(+상세페이지 이미지 선택) → 문구만 쓰고 배포
 app.post("/api/jobs/copy", upload.fields([{ name: "video", maxCount: 1 }, { name: "detail", maxCount: 300 }]), (req, res) => {
   const video = req.files?.video?.[0];
@@ -242,7 +244,7 @@ app.post("/api/jobs/copy", upload.fields([{ name: "video", maxCount: 1 }, { name
     const src = path.join(product_dir, "숏츠_영상", "원본영상" + ext);
     fs.renameSync(video.path, src);
     if (details.length) saveDetailImages(product_dir, details.map((f) => f.path));
-    saveJob({ id, kind: "copy", product_name: name, product_dir, source_video: src, status: "queued", log: [], uploads: {}, naver: { clip: false, shopping: false } });
+    saveJob({ id, kind: "copy", brand: shortsBrand(req.body.brand), product_name: name, product_dir, source_video: src, status: "queued", log: [], uploads: {}, naver: { clip: false, shopping: false } });
     startGeneration(id);
     res.json(view(loadJob(id)));
   } catch (e) {
@@ -285,7 +287,7 @@ app.post("/api/jobs", upload.fields([{ name: "zip", maxCount: 1 }, { name: "deta
     } else ({ files, product_dir } = savePhotoFolder(id, photos, JSON.parse(req.body.photo_paths || "[]")));
     if (files < 3) throw new Error("zip 안에 파일이 거의 없어요");
     if (details.length) saveDetailImages(product_dir, details.map((f) => f.path));
-    saveJob({ id, product_name: name, product_dir, status: "queued", log: [], uploads: {}, naver: { clip: false, shopping: false } });
+    saveJob({ id, brand: shortsBrand(req.body.brand), product_name: name, product_dir, status: "queued", log: [], uploads: {}, naver: { clip: false, shopping: false } });
     startGeneration(id);
     res.json(view(loadJob(id)));
   } catch (e) {
