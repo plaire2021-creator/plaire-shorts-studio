@@ -1585,6 +1585,15 @@ function blRender() {
   const imgs = x.images || [];
   $("blImgCount").textContent = imgs.length ? `${imgs.length}장 · 3:2` : "";
   $("blImgs").innerHTML = imgs.map((n, i) => `<figure><img src="/api/blog/runs/${r.id}/img/${encodeURIComponent(n)}" alt="" loading="lazy"><figcaption>사진 ${i + 1}</figcaption></figure>`).join("");
+  // 움직이는 이미지: GIF 2개 + 16:9 영상 (각각 받기 버튼)
+  const mo = [...(x.gifs || []).map((n, i) => ({ n, label: `GIF ${i + 1}` })), ...(x.video ? [{ n: x.video, label: "영상 (16:9 · 10초)" }] : [])];
+  $("blMotion").classList.toggle("hidden", !mo.length);
+  $("blMotion").innerHTML = mo.length
+    ? `<h3>움직이는 이미지</h3><div class="bl-mo-list">${mo.map((m) => {
+        const u = `/api/blog/runs/${r.id}/img/${encodeURIComponent(m.n)}`;
+        return `<figure>${/\.mp4$/i.test(m.n) ? `<video src="${u}" controls muted loop playsinline preload="metadata"></video>` : `<img src="${u}" alt="" loading="lazy">`}<figcaption>${m.label}<a class="mini" href="${u}" download="${esc(m.n)}">받기</a></figcaption></figure>`;
+      }).join("")}</div>`
+    : "";
   $("blZipBtn").href = `/api/blog/runs/${r.id}/zip`;
   $("blZipBtn").classList.toggle("hidden", !x.zip);
   $("blNotes").innerHTML = (x.notes || []).map((n) => `<li>${esc(n)}</li>`).join("");

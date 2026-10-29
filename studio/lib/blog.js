@@ -74,6 +74,7 @@ export function startRun({ id, brand, product_name, product_dir, topic = "" }) {
     `작업 폴더: ${work}`,
     `result.json: ${resultPath}`,
     `오늘 날짜: ${today} (요즘 화제를 고를 때 기준)`,
+    "사진 zip과 함께 움직이는 이미지(GIF 2개 + 16:9 10초 영상)도 스킬 4-2단계대로 꼭 만든다.",
     "질문하지 말고 끝까지 진행해. 명령은 Bash 도구로 실행해.",
     "진행 상황 메모와 명령 설명은 담당자가 화면에서 읽으니 한국어로 짧게 써.",
   ].join("\n");
@@ -125,7 +126,7 @@ export function startRun({ id, brand, product_name, product_dir, topic = "" }) {
 export function imagePath(id, name) {
   const r = loadRun(id);
   const zip = r?.result?.zip;
-  if (!zip || !/^\d{2}\.jpg$/.test(name)) return null;
+  if (!zip || !/^(\d{2}\.jpg|움직임_\d\.gif|영상_16x9\.mp4)$/.test(name)) return null; // 사진·GIF·영상
   const p = path.join(zip.replace(/\.zip$/i, ""), name);
   return fs.existsSync(p) ? p : null;
 }
