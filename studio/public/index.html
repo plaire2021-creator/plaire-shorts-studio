@@ -112,13 +112,19 @@
       <section class="card" id="blInput">
         <div class="card-head"><h2>제품 자료 넣기</h2></div>
         <div class="fg">
-          <label class="fg-label" for="blName">제품명</label>
-          <input class="field" id="blName" placeholder="예: 블랑누아 월넛 거실장">
+          <label class="fg-label" for="blUrl">스마트스토어 상품 링크</label>
+          <input class="field" id="blUrl" inputmode="url" placeholder="예: https://brand.naver.com/plaire/products/13772703797">
+          <p class="muted fg-help">상품명과 상세페이지는 이 링크에서 읽어 와요 (30초쯤 걸려요).</p>
         </div>
         <div class="fg">
           <label class="fg-label" for="blTopic">특별히 원하시는 주제가 있으세요? <small>선택</small></label>
           <textarea class="field bl-topic" id="blTopic" rows="2" placeholder="예: 신혼집 거실 꾸미기, 강남 ○○ 아파트 입주, 카페 창업 인테리어"></textarea>
           <p class="muted bl-topic-help" id="blTopicHelp"></p>
+        </div>
+        <details class="alt-in" id="blAlt"><summary>링크 대신 제품명·상세페이지 이미지로 넣기</summary>
+        <div class="fg">
+          <label class="fg-label" for="blName">제품명 <small>링크를 넣었으면 비워도 돼요</small></label>
+          <input class="field" id="blName" placeholder="예: 블랑누아 월넛 거실장">
         </div>
         <div class="fg">
           <span class="fg-label">상세페이지 이미지 <small>이미지 여러 장 또는 폴더째 · 파일 이름 순서대로</small></span>
@@ -131,6 +137,7 @@
           </div>
           <div class="thumbs hidden" id="blDetailThumbs"></div>
         </div>
+        </details>
         <div class="fg">
           <span class="fg-label">제품 이미지 <small>사진 폴더를 그대로 놓거나 zip 파일</small></span>
           <div class="drop compact" id="blPhotoDrop" role="button" tabindex="0">
@@ -364,7 +371,14 @@
         <div class="card-head"><h2>새 영상 만들기</h2><span class="tag">1단계</span></div>
 
         <div class="fg">
-          <label class="fg-label" for="productName">제품명</label>
+          <label class="fg-label" for="storeUrl">스마트스토어 상품 링크</label>
+          <input class="field" id="storeUrl" inputmode="url" placeholder="예: https://brand.naver.com/plaire/products/13772703797">
+          <p class="muted fg-help">상품명과 상세페이지는 이 링크에서 읽어 와요 (30초쯤 걸려요).</p>
+        </div>
+
+        <details class="alt-in" id="shAlt"><summary>링크 대신 제품명·상세페이지 이미지로 넣기</summary>
+        <div class="fg">
+          <label class="fg-label" for="productName">제품명 <small>링크를 넣었으면 비워도 돼요</small></label>
           <input class="field" id="productName" placeholder="예: 미드센츄리 모듈 3단 서랍장">
         </div>
 
@@ -379,6 +393,7 @@
           </div>
           <div class="thumbs hidden" id="detailThumbs"></div>
         </div>
+        </details>
 
         <div class="fg">
           <span class="fg-label">제품 이미지 <small>사진 폴더를 그대로 놓거나 zip 파일</small></span>
@@ -401,7 +416,12 @@
         <div class="card-head"><h2>새 영상 올리기</h2><span class="tag">1단계</span></div>
 
         <div class="fg">
-          <label class="fg-label" for="copyName">제품명</label>
+          <label class="fg-label" for="copyUrl">스마트스토어 상품 링크</label>
+          <input class="field" id="copyUrl" inputmode="url" placeholder="예: https://brand.naver.com/plaire/products/13772703797">
+          <p class="muted fg-help">상품명과 상세페이지는 이 링크에서 읽어 와요 (30초쯤 걸려요).</p>
+        </div>
+        <div class="fg">
+          <label class="fg-label" for="copyName">제품명 <small>링크를 넣었으면 비워도 돼요</small></label>
           <input class="field" id="copyName" placeholder="예: 블랑누아 월넛 거실장">
         </div>
 

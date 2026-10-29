@@ -19,6 +19,7 @@ import * as monthly from "./lib/monthly.js";
 import * as team from "./lib/team.js";
 import * as backup from "./lib/backup.js";
 import * as blog from "./lib/blog.js";
+import { anyFetching, fetchStore, isStoreUrl } from "./lib/storefetch.js";
 import * as launch from "./lib/launch.js";
 import * as plans from "./lib/plans.js";
 import * as goals from "./lib/goals.js";
@@ -226,6 +227,22 @@ app.post("/api/weekly/runs", upload.array("files", 10), (req, res) => {
   }
 });
 
+// 숏츠: 링크로 상품명·상세페이지를 읽고 나서 만들기 시작 (실패하면 실패로 표시 — 상세페이지 이미지로 다시)
+function readStoreThenGenerate(id, url, productDir, name) {
+  fetchStore(url)
+    .then((s) => {
+      const j = loadJob(id);
+      if (!j) return fs.rmSync(s.dir, { recursive: true, force: true }); // 그사이 취소·삭제됨
+      if (s.detail_images.length) saveDetailImages(productDir, s.detail_images);
+      fs.rmSync(s.dir, { recursive: true, force: true });
+      saveJob({ ...j, product_name: name || s.name, store_name: s.name, status: "queued", log: [...(j.log || []), { t: new Date().toISOString(), m: `상세페이지 ${s.detail_images.length}장을 읽었어요` }] });
+      startGeneration(id);
+    })
+    .catch((e) => {
+      const j = loadJob(id);
+      if (j) saveJob({ ...j, status: "failed", error: e.message + " — 상세페이지 이미지를 직접 넣어서 다시 만들어 주세요" });
+    });
+}
 const shortsBrand = (b) => (b === "가즈다가구" ? "가즈다가구" : "플레르가구"); // 예전 작업·값 없음 = 플레르
 
 // 이미 만든 영상 올리기: 영상 1개(+상세페이지 이미지 선택) → 문구만 쓰고 배포
@@ -234,7 +251,7 @@ app.post("/api/jobs/copy", upload.fields([{ name: "video", maxCount: 1 }, { name
   const details = req.files?.detail || [];
   try {
     const name = String(req.body.product_name || "").trim();
-    if (!name) throw new Error("제품명을 입력해 주세요");
+    if (!name && !String(req.body.store_url || "").trim()) throw new Error("스마트스토어 상품 링크나 제품명을 넣어 주세요");
     if (!video) throw new Error("올릴 영상 파일을 넣어 주세요");
     const ext = (path.extname(video.originalname) || ".mp4").toLowerCase();
     if (![".mp4", ".mov", ".m4v", ".webm"].includes(ext)) throw new Error("mp4·mov 영상 파일만 올릴 수 있어요");
@@ -244,9 +261,16 @@ app.post("/api/jobs/copy", upload.fields([{ name: "video", maxCount: 1 }, { name
     const src = path.join(product_dir, "숏츠_영상", "원본영상" + ext);
     fs.renameSync(video.path, src);
     if (details.length) saveDetailImages(product_dir, details.map((f) => f.path));
-    saveJob({ id, kind: "copy", brand: shortsBrand(req.body.brand), product_name: name, product_dir, source_video: src, status: "queued", log: [], uploads: {}, naver: { clip: false, shopping: false } });
-    startGeneration(id);
+    const storeUrl = String(req.body.store_url || "").trim();
+    if (storeUrl && !isStoreUrl(storeUrl)) throw new Error("스마트스토어 상품 링크를 확인해 주세요 (…naver.com/스토어/products/번호)");
+    if (!storeUrl) {
+      saveJob({ id, kind: "copy", brand: shortsBrand(req.body.brand), product_name: name, product_dir, source_video: src, status: "queued", log: [], uploads: {}, naver: { clip: false, shopping: false } });
+      startGeneration(id);
+      return res.json(view(loadJob(id)));
+    }
+    saveJob({ id, kind: "copy", brand: shortsBrand(req.body.brand), product_name: name || "스마트스토어 상품", store_url: storeUrl, product_dir, source_video: src, status: "generating", server_pid: process.pid, started_at: new Date().toISOString(), log: [{ t: new Date().toISOString(), m: "스마트스토어에서 상품명·상세페이지를 읽는 중이에요" }], uploads: {}, naver: { clip: false, shopping: false } });
     res.json(view(loadJob(id)));
+    readStoreThenGenerate(id, storeUrl, product_dir, name);
   } catch (e) {
     err(res, e);
   } finally {
@@ -275,8 +299,11 @@ app.post("/api/jobs", upload.fields([{ name: "zip", maxCount: 1 }, { name: "deta
   const photos = req.files?.photos || []; // 폴더째 올린 제품 사진
   try {
     const name = String(req.body.product_name || "").trim();
+    const storeUrl = String(req.body.store_url || "").trim();
     if (!zipFile && !photos.length) throw new Error("제품 사진 폴더나 zip 파일을 넣어 주세요");
-    if (!name) throw new Error("제품명을 입력해 주세요");
+    if (storeUrl && !isStoreUrl(storeUrl)) throw new Error("스마트스토어 상품 링크를 확인해 주세요 (…naver.com/스토어/products/번호)");
+    if (!storeUrl && !name) throw new Error("스마트스토어 상품 링크나 제품명을 넣어 주세요");
+    if (!storeUrl && !details.length) throw new Error("스마트스토어 상품 링크를 넣거나 상세페이지 이미지를 넣어 주세요");
     const id = newJobId();
     fs.mkdirSync(jobDir(id), { recursive: true });
     let files, product_dir;
@@ -287,9 +314,15 @@ app.post("/api/jobs", upload.fields([{ name: "zip", maxCount: 1 }, { name: "deta
     } else ({ files, product_dir } = savePhotoFolder(id, photos, JSON.parse(req.body.photo_paths || "[]")));
     if (files < 3) throw new Error("zip 안에 파일이 거의 없어요");
     if (details.length) saveDetailImages(product_dir, details.map((f) => f.path));
-    saveJob({ id, brand: shortsBrand(req.body.brand), product_name: name, product_dir, status: "queued", log: [], uploads: {}, naver: { clip: false, shopping: false } });
-    startGeneration(id);
+    if (!storeUrl) {
+      saveJob({ id, brand: shortsBrand(req.body.brand), product_name: name, product_dir, status: "queued", log: [], uploads: {}, naver: { clip: false, shopping: false } });
+      startGeneration(id);
+      return res.json(view(loadJob(id)));
+    }
+    // 링크: 상품명·상세페이지를 먼저 읽고 영상 만들기 시작
+    saveJob({ id, brand: shortsBrand(req.body.brand), product_name: name || "스마트스토어 상품", store_url: storeUrl, product_dir, status: "generating", server_pid: process.pid, started_at: new Date().toISOString(), log: [{ t: new Date().toISOString(), m: "스마트스토어에서 상품명·상세페이지를 읽는 중이에요" }], uploads: {}, naver: { clip: false, shopping: false } });
     res.json(view(loadJob(id)));
+    readStoreThenGenerate(id, storeUrl, product_dir, name);
   } catch (e) {
     err(res, e);
   } finally {
@@ -514,8 +547,13 @@ app.post("/api/blog/runs", upload.fields([{ name: "zip", maxCount: 1 }, { name: 
   const photos = req.files?.photos || [];
   try {
     const name = String(req.body.product_name || "").trim();
-    if (!name) throw new Error("제품명을 입력해 주세요");
+    const storeUrl = String(req.body.store_url || "").trim();
+    if (storeUrl && !isStoreUrl(storeUrl)) throw new Error("스마트스토어 상품 링크를 확인해 주세요 (…naver.com/스토어/products/번호)");
+    if (!storeUrl && !name) throw new Error("스마트스토어 상품 링크나 제품명을 넣어 주세요");
+    if (!storeUrl && !details.length) throw new Error("스마트스토어 상품 링크를 넣거나 상세페이지 이미지를 넣어 주세요");
     if (!zipFile && !photos.length) throw new Error("제품 사진 폴더나 zip 파일을 넣어 주세요");
+    const brand = String(req.body.brand || "");
+    if (!blog.BRANDS.includes(brand)) throw new Error("브랜드를 골라 주세요");
     const id = newJobId();
     const dest = path.join(blog.runDir(id), "product");
     fs.mkdirSync(dest, { recursive: true });
@@ -526,7 +564,18 @@ app.post("/api/blog/runs", upload.fields([{ name: "zip", maxCount: 1 }, { name: 
       ({ product_dir } = unzipInto(id, zip, dest));
     } else ({ product_dir } = savePhotoFolder(id, photos, JSON.parse(req.body.photo_paths || "[]"), dest));
     if (details.length) saveDetailImages(product_dir, details.map((f) => f.path));
-    res.json(blog.startRun({ id, brand: String(req.body.brand || ""), product_name: name, product_dir, topic: String(req.body.topic || "").trim().slice(0, 300) }));
+    const topic = String(req.body.topic || "").trim().slice(0, 300);
+    if (!storeUrl) return res.json(blog.startRun({ id, brand, product_name: name, product_dir, topic }));
+    // 링크: 이 PC 크롬으로 상품명·상세페이지를 읽은 뒤 글쓰기 시작 (그동안 화면에는 '읽는 중')
+    res.json(blog.beginFetch({ id, brand, product_name: name, topic, store_url: storeUrl }));
+    fetchStore(storeUrl)
+      .then((s) => {
+        if (!blog.loadRun(id)) return fs.rmSync(s.dir, { recursive: true, force: true }); // 그사이 취소됨
+        if (s.detail_images.length) saveDetailImages(product_dir, s.detail_images);
+        fs.rmSync(s.dir, { recursive: true, force: true });
+        blog.startRun({ id, brand, product_name: name || s.name, product_dir, topic, store_url: storeUrl, store_name: s.name });
+      })
+      .catch((e) => blog.failRun(id, e.message + " — 상세페이지 이미지를 직접 넣어서 다시 해 주세요"));
   } catch (e) {
     err(res, e);
   } finally {
@@ -812,6 +861,7 @@ const busyNow = () =>
   monthly.isBusy() ||
   reviews.anyRunning() ||
   blog.anyRunning() ||
+  anyFetching() ||
   listJobs().some((j) => Object.values(j.uploads || {}).some((u) => u.state === "uploading"));
 app.get("/api/health", (req, res) => res.json({ ok: true, version: VERSION, busy: busyNow(), pid: process.pid }));
 

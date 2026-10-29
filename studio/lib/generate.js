@@ -179,6 +179,7 @@ export function startGeneration(id, { revision } = {}) {
     `플러그인 루트: ${PLUGIN_ROOT}`,
     `제품 폴더: ${product}`,
     `상품명: ${job.product_name}`,
+    job.store_url ? `스마트스토어 상품 링크: ${job.store_url} (상세페이지는 이 링크에서 읽어 '상세페이지_등록'에 넣어 둠. 상품명이 길면 엔딩에는 짧은 대표 이름으로)` : "",
     `브랜드: ${job.brand || "플레르가구"} (스킬의 '브랜드별 규칙'대로 엔딩 브랜드·CTA·자막·제목·설명글 타깃을 맞출 것)`,
     revision ? `수정 요청: ${revision}` : "",
     "질문하지 말고 끝까지 진행하고, 업로드는 하지 마.",

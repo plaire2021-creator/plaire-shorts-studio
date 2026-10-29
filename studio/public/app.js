@@ -146,6 +146,8 @@ $("shSeg").onclick = (e) => {
 };
 shSetBrand(shBrand);
 
+const isStoreUrl = (u) => /^https?:\/\/(m\.)?(smartstore|brand)\.naver\.com\/[^/\s]+\/products\/\d+/.test(String(u || "").trim()); // 스마트스토어·브랜드스토어 상품 링크
+
 function show(ids) {
   if (["shorts", "upload"].includes(route.current)) $("crumb").textContent = ids.includes("settings") ? "숏츠 설정" : ids.includes("stepInput") ? (uploadMode() ? "새 업로드" : "새 영상") : current?.product_name || "영상";
   $("settingsBtn").classList.toggle("on", ids.includes("settings"));
@@ -198,6 +200,7 @@ function newJob() {
   current = null;
   clearInterval(poll);
   $("productName").value = "";
+  $("storeUrl").value = "";
   setProduct(null);
   resetCopyInput();
   setDetails([]);
@@ -463,6 +466,7 @@ function setCopyVideo(f) {
 $("videoClear").onclick = () => setCopyVideo(null);
 function resetCopyInput() {
   $("copyName").value = "";
+  $("copyUrl").value = "";
   $("copyErr").textContent = "";
   setCopyVideo(null);
 }
@@ -480,10 +484,13 @@ document.addEventListener("click", (e) => {
 $("copyBtn").onclick = async () => {
   const name = $("copyName").value.trim();
   if (!status?.claude?.connected) return ($("copyErr").textContent = "먼저 왼쪽 위 Claude 로그인을 눌러 로그인해 주세요");
-  if (!name) return ($("copyErr").textContent = "제품명을 입력해 주세요");
+  const url = $("copyUrl").value.trim();
+  if (url && !isStoreUrl(url)) return ($("copyErr").textContent = "스마트스토어 상품 링크를 확인해 주세요 (…naver.com/스토어/products/번호)");
+  if (!url && !name) return ($("copyErr").textContent = "스마트스토어 상품 링크나 제품명을 넣어 주세요");
   if (!copyVideo) return ($("copyErr").textContent = "올릴 영상 파일을 넣어 주세요");
   const fd = new FormData();
   fd.append("product_name", name);
+  fd.append("store_url", url);
   fd.append("brand", shBrand);
   fd.append("video", copyVideo);
   $("copyBtn").disabled = true;
@@ -502,11 +509,14 @@ $("copyBtn").onclick = async () => {
 $("createBtn").onclick = async () => {
   const name = $("productName").value.trim();
   if (!status?.claude?.connected) return ($("inputErr").textContent = "먼저 왼쪽 위 Claude 로그인을 눌러 로그인해 주세요");
-  if (!name) return ($("inputErr").textContent = "제품명을 입력해 주세요");
-  if (!details.length) return ($("inputErr").textContent = "상세페이지 이미지를 넣어 주세요");
+  const url = $("storeUrl").value.trim();
+  if (url && !isStoreUrl(url)) return ($("inputErr").textContent = "스마트스토어 상품 링크를 확인해 주세요 (…naver.com/스토어/products/번호)");
+  if (!url && !name) return ($("inputErr").textContent = "스마트스토어 상품 링크를 넣어 주세요 (또는 아래에서 제품명·상세페이지 이미지)");
+  if (!url && !details.length) return ($("inputErr").textContent = "스마트스토어 상품 링크를 넣거나 상세페이지 이미지를 넣어 주세요");
   if (!product) return ($("inputErr").textContent = "제품 사진 폴더나 zip 파일을 넣어 주세요");
   const fd = new FormData();
   fd.append("product_name", name);
+  fd.append("store_url", url);
   fd.append("brand", shBrand);
   for (const d of details) fd.append("detail", d.file);
   if (product.zip) fd.append("zip", product.zip);
@@ -1508,12 +1518,15 @@ $("blPhotoDrop").addEventListener("click", (e) => !e.target.closest("[data-pick]
 $("blRun").onclick = async () => {
   const name = $("blName").value.trim();
   if (!status?.claude?.connected) return ($("blErr").textContent = "먼저 왼쪽 위 Claude 로그인을 해 주세요");
-  if (!name) return ($("blErr").textContent = "제품명을 입력해 주세요");
-  if (!blDetails.length) return ($("blErr").textContent = "상세페이지 이미지를 넣어 주세요");
+  const url = $("blUrl").value.trim();
+  if (url && !isStoreUrl(url)) return ($("blErr").textContent = "스마트스토어 상품 링크를 확인해 주세요 (…naver.com/스토어/products/번호)");
+  if (!url && !name) return ($("blErr").textContent = "스마트스토어 상품 링크를 넣어 주세요 (또는 아래에서 제품명·상세페이지 이미지)");
+  if (!url && !blDetails.length) return ($("blErr").textContent = "스마트스토어 상품 링크를 넣거나 상세페이지 이미지를 넣어 주세요");
   if (!blProduct) return ($("blErr").textContent = "제품 사진 폴더나 zip 파일을 넣어 주세요");
   const fd = new FormData();
   fd.append("brand", blBrand);
   fd.append("product_name", name);
+  fd.append("store_url", url);
   fd.append("topic", $("blTopic").value.trim());
   for (const d of blDetails) fd.append("detail", d.file);
   if (blProduct.zip) fd.append("zip", blProduct.zip);
@@ -1526,6 +1539,7 @@ $("blRun").onclick = async () => {
   try {
     const r = await api("/api/blog/runs", { method: "POST", body: fd });
     $("blName").value = "";
+    $("blUrl").value = "";
     $("blTopic").value = "";
     blSetDetails([]);
     blSetProduct(null);

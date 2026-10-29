@@ -53,7 +53,15 @@ const TARGET = {
   플레르가구: "가정집 — 신혼부부·이사·입주 준비·아이 있는 집·홈카페/홈시네마 등 집에서 쓰는 사람",
   가즈다가구: "업소 — 카페·식당·사무실·학원·병원 대기실·매장 등을 운영하거나 꾸미는 사장님·담당자",
 };
-export function startRun({ id, brand, product_name, product_dir, topic = "" }) {
+// 링크를 읽는 동안: 기록만 '진행 중'으로 (글쓰기는 읽고 나서 startRun)
+export function beginFetch({ id, brand, product_name, topic, store_url }) {
+  return saveRun({ id, brand, product_name: product_name || "스마트스토어 상품", topic, store_url, status: "running", server_pid: process.pid, started_at: new Date().toISOString(), log: ["스마트스토어에서 상품명·상세페이지를 읽는 중이에요"] });
+}
+export function failRun(id, error) {
+  const r = loadRun(id);
+  if (r) saveRun({ ...r, status: "failed", finished_at: new Date().toISOString(), error });
+}
+export function startRun({ id, brand, product_name, product_dir, topic = "", store_url = "", store_name = "" }) {
   if (!BRANDS.includes(brand)) throw new Error("브랜드를 골라 주세요");
   const exe = findClaude();
   if (!exe) throw new Error("Claude Code를 찾지 못했어요");
@@ -70,6 +78,7 @@ export function startRun({ id, brand, product_name, product_dir, topic = "" }) {
     `글쓴이: ${brand} 판매자(담당자) — 소비자·구매자 입장의 1인칭 경험담 금지, 판매자가 고객에게 알려 주는 시점으로`,
     topic ? `원하는 주제(담당자 요청 — 이 주제를 중심으로 쓰고, 그 안에서 검색 수요 큰 키워드를 고른다): ${topic}` : "원하는 주제: 없음 — 타깃 고객이 지금 많이 찾는 주제·키워드를 직접 조사해서 고른다",
     `제품명: ${product_name}`,
+    store_url ? `스마트스토어 상품 링크: ${store_url} (상세페이지는 이 링크에서 읽어 '상세페이지_등록'에 넣어 둠. 스토어 상품명: ${store_name})` : "",
     `제품 폴더(제품 사진 + 상세페이지_등록): ${product_dir}`,
     `작업 폴더: ${work}`,
     `result.json: ${resultPath}`,
@@ -77,8 +86,11 @@ export function startRun({ id, brand, product_name, product_dir, topic = "" }) {
     "사진 zip과 함께 움직이는 이미지(GIF 2개 + 16:9 10초 영상)도 스킬 4-2단계대로 꼭 만든다.",
     "질문하지 말고 끝까지 진행해. 명령은 Bash 도구로 실행해.",
     "진행 상황 메모와 명령 설명은 담당자가 화면에서 읽으니 한국어로 짧게 써.",
-  ].join("\n");
-  const run = saveRun({ id, brand, product_name, topic, status: "running", server_pid: process.pid, started_at: new Date().toISOString(), log: ["자료를 받았어요. 주제·키워드를 찾아볼게요"] });
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const prev = loadRun(id);
+  const run = saveRun({ id, brand, product_name, topic, store_url, status: "running", server_pid: process.pid, started_at: new Date().toISOString(), log: [...(prev?.log || []), "자료를 받았어요. 주제·키워드를 찾아볼게요"] });
   const args = ["-p", prompt, "--output-format", "stream-json", "--verbose", "--allowedTools", "Bash Read Write Edit Glob Grep WebSearch WebFetch", "--add-dir", PLUGIN_ROOT];
   const child = spawn(exe, args, { cwd: work, env: { ...process.env, PYTHONUTF8: "1" }, stdio: ["ignore", "pipe", "pipe"] });
   running.set(id, child);
