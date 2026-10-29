@@ -466,7 +466,6 @@ function setCopyVideo(f) {
 $("videoClear").onclick = () => setCopyVideo(null);
 function resetCopyInput() {
   $("copyName").value = "";
-  $("copyUrl").value = "";
   $("copyErr").textContent = "";
   setCopyVideo(null);
 }
@@ -484,13 +483,10 @@ document.addEventListener("click", (e) => {
 $("copyBtn").onclick = async () => {
   const name = $("copyName").value.trim();
   if (!status?.claude?.connected) return ($("copyErr").textContent = "먼저 왼쪽 위 Claude 로그인을 눌러 로그인해 주세요");
-  const url = $("copyUrl").value.trim();
-  if (url && !isStoreUrl(url)) return ($("copyErr").textContent = "스마트스토어 상품 링크를 확인해 주세요 (…naver.com/스토어/products/번호)");
-  if (!url && !name) return ($("copyErr").textContent = "스마트스토어 상품 링크나 제품명을 넣어 주세요");
+  if (!name) return ($("copyErr").textContent = "제품명을 입력해 주세요");
   if (!copyVideo) return ($("copyErr").textContent = "올릴 영상 파일을 넣어 주세요");
   const fd = new FormData();
   fd.append("product_name", name);
-  fd.append("store_url", url);
   fd.append("brand", shBrand);
   fd.append("video", copyVideo);
   $("copyBtn").disabled = true;
