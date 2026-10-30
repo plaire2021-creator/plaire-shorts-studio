@@ -9,7 +9,7 @@ motion.json:
   {"gifs": [{"kind": "fade", "shots": [{file,cx,cy,zoom}, ...3~4장]},      ← 컬러·각도 넘겨보기
             {"kind": "zoom", "shots": [{file,cx,cy}], "to": 1.7}],         ← 한 장에서 디테일(cx,cy)로 천천히 당기기
    "video": {"shots": [{file,cx,cy}, ...3~5장], "title": "제품명", "brand": "플레르가구"}}
-결과: <출력폴더>/움직임_1.gif, 움직임_2.gif (720×480, 3초 안팎 반복), 영상_16x9.mp4 (1920×1080, 10초, 소리 없음),
+결과: <출력폴더>/움직임_1.gif, 움직임_2.gif (800×533, 3초 안팎 반복), 영상_16x9.mp4 (1920×1080, 10초, 소리 없음),
       <출력폴더>/_움직임_검수.jpg (GIF·영상 장면 모아보기)
 마지막 줄에 결과 JSON.
 """
@@ -122,7 +122,7 @@ def frame(src, w, h, cx=0.5, cy=0.5, zoom=1.0):
     bw, bh = bw / z, bh / z
     x0 = min(max(cx * iw - bw / 2, 0), iw - bw)
     y0 = min(max(cy * ih - bh / 2, 0), ih - bh)
-    return im.resize((w, h), Image.BILINEAR, box=(x0, y0, x0 + bw, y0 + bh))
+    return im.resize((w, h), Image.LANCZOS, box=(x0, y0, x0 + bw, y0 + bh))
 
 
 def ease(t):
@@ -130,7 +130,7 @@ def ease(t):
     return t * t * (3 - 2 * t)
 
 
-def gif_fade(shots, w=720, h=480, fps=12, hold=0.9, fade=0.4):
+def gif_fade(shots, w=800, h=533, fps=15, hold=0.9, fade=0.4):
     """사진 여러 장을 천천히 넘기며 반복 (컬러·각도 보여 주기)"""
     pics = [frame(s["file"], w, h, s.get("cx", 0.5), s.get("cy", 0.5), s.get("zoom", 1.0)) for s in shots]
     out = []
@@ -142,7 +142,7 @@ def gif_fade(shots, w=720, h=480, fps=12, hold=0.9, fade=0.4):
     return out, fps
 
 
-def gif_zoom(shot, to=1.7, w=720, h=480, fps=12, move=2.2, hold=0.9):
+def gif_zoom(shot, to=1.7, w=800, h=533, fps=15, move=2.2, hold=0.9):
     """한 장에서 디테일(cx,cy)로 천천히 당겼다가 잠깐 멈춤 → 처음으로 (반복)"""
     cx, cy = shot.get("cx", 0.5), shot.get("cy", 0.5)
     z0 = max(1.0, float(shot.get("zoom", 1.0)))
@@ -159,10 +159,32 @@ def gif_zoom(shot, to=1.7, w=720, h=480, fps=12, move=2.2, hold=0.9):
 
 
 def save_gif(frames, fps, path):
-    # 모든 프레임이 같은 팔레트를 쓰게 (깜빡임 줄이고 용량도 작게)
-    pal = frames[len(frames) // 2].convert("P", palette=Image.ADAPTIVE, colors=128)
-    ps = [f.quantize(palette=pal, dither=Image.Dither.NONE) for f in frames]
-    ps[0].save(path, save_all=True, append_images=ps[1:], duration=round(1000 / fps), loop=0, optimize=True, disposal=1)
+    """GIF는 256색뿐이라 색 고르기가 화질을 좌우한다.
+    ffmpeg palettegen(모든 프레임에서 256색) + paletteuse(디더링)로 만들어 어두운 면·커튼·벽의 계단 무늬를 없앤다.
+    ffmpeg가 안 되면 Pillow로(여러 프레임에서 256색 + 디더링)."""
+    tmp = path + "_frames"
+    shutil.rmtree(tmp, ignore_errors=True)
+    os.makedirs(tmp)
+    try:
+        for i, f in enumerate(frames):
+            f.save(os.path.join(tmp, f"{i:04d}.png"))
+        vf = "split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle"
+        r = subprocess.run([find_ffmpeg(), "-y", "-v", "error", "-framerate", str(fps), "-i", os.path.join(tmp, "%04d.png"),
+                            "-vf", vf, "-loop", "0", path], capture_output=True, text=True)
+        if r.returncode == 0 and os.path.exists(path):
+            return
+    except SystemExit:
+        pass
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    # 대안: 여러 프레임을 이어 붙인 그림에서 256색을 뽑고 디더링
+    pick = frames[:: max(1, len(frames) // 6)]
+    strip = Image.new("RGB", (pick[0].width, pick[0].height * len(pick)))
+    for k, f in enumerate(pick):
+        strip.paste(f, (0, k * f.height))
+    pal = strip.quantize(colors=256, method=Image.Quantize.MEDIANCUT)
+    ps = [f.quantize(palette=pal, dither=Image.Dither.FLOYDSTEINBERG) for f in frames]
+    ps[0].save(path, save_all=True, append_images=ps[1:], duration=round(1000 / fps), loop=0, optimize=False, disposal=1)
 
 
 def font(size, bold=False):
