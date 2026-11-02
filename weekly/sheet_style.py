@@ -4,7 +4,7 @@
 (weekly/ 와 monthly/ 에 같은 파일이 하나씩 있다. 고칠 때는 둘 다 고칠 것)
 
 값·수식·병합·열 너비·차트는 건드리지 않고, 글꼴·크기·테두리·정렬·줄 높이·머리글/강조 색을 바꾼다.
-표시 형식은 '일반'인 숫자 칸만 천 단위 쉼표(#,##0)로 (코드·순위·%·날짜 형식은 그대로).
+표시 형식은 '일반'인 숫자 칸만 천 단위 쉼표(#,##0)로. 상품 코드·아이디 열은 쉼표 없이(있으면 지움), 앞뒤 공백 제거.
 
 표 찾는 법(양식이 조금씩 달라도 되게 칸 위치를 고정하지 않는다):
   - 시트를 '빈 열'로 나눈 덩어리(블록) 하나하나를, 다시 '빈 행'으로 나눈다.
@@ -32,7 +32,7 @@ GRID = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 NONE = Border()
 HEAD_FILL = PatternFill("solid", fgColor="FFDDE5F3")
 HIGHLIGHT = PatternFill("solid", fgColor="FFFFF2CC")
-CODE_WORDS = ("코드", "ID", "id", "번호")
+CODE_WORDS = ("코드", "아이디", "ID", "id", "번호")
 
 
 def _num(v):
@@ -181,7 +181,14 @@ def normalize_sheet(ws):
                         _align(x, "center")
                     else:
                         _font(x, SIZE, False)
-                        if (c == first and rank_col) or c in code_col:
+                        if c in code_col:
+                            # 상품 코드·아이디: 쉼표 없이 숫자 그대로, 붙여 넣다 딸려 온 앞뒤 공백(줄바꿈 없는 공백 포함)은 뺀다
+                            _align(x, "center")
+                            if "," in x.number_format or "E" in x.number_format:
+                                x.number_format = "General"
+                            if isinstance(x.value, str) and x.value != x.value.strip().replace("\xa0", ""):
+                                x.value = x.value.strip().replace("\xa0", "")
+                        elif c == first and rank_col:
                             _align(x, "center")
                         elif _num(v):
                             _align(x, "right")
